@@ -1,0 +1,68 @@
+{
+	"version": 0,
+	"dependencies": [
+		{
+			"importpath": "github.com/PuerkitoBio/gocrawl",
+			"repository": "https://github.com/PuerkitoBio/gocrawl",
+			"revision": "8368ebcaef6983b3c23089429b7f996b77674622",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/PuerkitoBio/goquery",
+			"repository": "https://github.com/PuerkitoBio/goquery",
+			"revision": "f0d75731e0db647903c8611d00c7b85002751317",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/PuerkitoBio/purell",
+			"repository": "https://github.com/PuerkitoBio/purell",
+			"revision": "1d5d1cfad45d42ec5f81fa8ef23de09cebc6dcc3",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/PuerkitoBio/urlesc",
+			"repository": "https://github.com/PuerkitoBio/urlesc",
+			"revision": "5fa9ff0392746aeae1c4b37fcc42c65afa7a9587",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/andybalholm/cascadia",
+			"repository": "https://github.com/andybalholm/cascadia",
+			"revision": "3ad29d1ad1c4f2023e355603324348cf1f4b2d48",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/garyburd/redigo/internal",
+			"repository": "https://github.com/garyburd/redigo",
+			"revision": "b8dc90050f24c1a73a52f107f3f575be67b21b7c",
+			"branch": "master",
+			"path": "/internal"
+		},
+		{
+			"importpath": "github.com/garyburd/redigo/redis",
+			"repository": "https://github.com/garyburd/redigo",
+			"revision": "b8dc90050f24c1a73a52f107f3f575be67b21b7c",
+			"branch": "master",
+			"path": "/redis"
+		},
+		{
+			"importpath": "github.com/golang/glog",
+			"repository": "https://github.com/golang/glog",
+			"revision": "23def4e6c14b4da8ac2ed8007337bc5eb5007998",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/temoto/robotstxt.go",
+			"repository": "https://github.com/temoto/robotstxt.go",
+			"revision": "99f6b48954d8cafb2f10790957aa747ca7aeb530",
+			"branch": "master"
+		},
+		{
+			"importpath": "golang.org/x/net/html",
+			"repository": "https://go.googlesource.com/net",
+			"revision": "4d38db76854b199960801a1734443fd02870d7e1",
+			"branch": "master",
+			"path": "/html"
+		}
+	]
+}
