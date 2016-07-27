@@ -26,18 +26,18 @@ type Options struct {
 }
 
 type Worker struct {
-	id   string
 	host string
 
 	// == channels
 	// incomming channel is where the jobs coming in
-	incoming chan url.URL
+	incoming popChannel
+	//pop      popChannel
 
 	// stop channel is where the worker receives its stop signal
 	stop chan int
 
 	// enqueue
-	enqueue chan<- interface{}
+	enqueue chan<- []*URLContext
 
 	timeout *time.Time
 
@@ -56,7 +56,7 @@ var HttpClient = &http.Client{
 
 func (w *Worker) run() {
 	defer func() {
-		glog.Infof("Worker #%s done.", w.id)
+		glog.Infof("Worker(%s) done.", w.host)
 	}()
 
 	for {
@@ -66,14 +66,108 @@ func (w *Worker) run() {
 			// clean up and exit
 			glog.Info("Stop signal received.")
 			return
-		case target := <-w.incoming:
-			w.crawl(target)
+		case jobs := <-w.incoming:
+			for _, ctx := range jobs {
+				w.crawl(ctx)
+			}
+		}
+
+		glog.Info(".")
+	}
+}
+
+// crawl function calls fetch to fetch remote web page then process the data
+func (w *Worker) crawl(target *URLContext) {
+	glog.Infof("Crawling URL: %s", target.normalizedURL.String())
+	if res, ok := w.fetchURL(target); ok {
+		// handle fetched web page
+		defer res.Body.Close()
+
+		// success
+		if res.StatusCode >= 200 && res.StatusCode < 300 {
+			w.visitURL(target, res)
+		} else {
+			// Error
+			glog.Errorf("Error status code for %s: %s", target, res.Status)
 		}
 	}
 }
 
-func (w *Worker) processLinks(target url.URL, doc *goquery.Document) (result []*url.URL) {
-	// <base> html tag for relative URLs
+func (w *Worker) fetchURL(target *URLContext) (res *http.Response, ok bool) {
+	glog.Infof("Fetching URL: %s", target.normalizedURL.String())
+
+	var err error
+
+	if res, err = w._fetch(target); err != nil {
+		if ue, ok := err.(*url.Error); ok {
+			// We do not let http client to handle redirection.
+			// Manually handling redirection would make sure all requests
+			// are following crawler's policy
+			if ue.Err == ErrEnqueueRedirect {
+				w.enqueueSingle(ue.URL, target)
+				glog.Warningf("Enqueuing redirection: %s", ue.URL)
+			}
+		}
+
+		glog.Errorf("%s Error while fetching %s: %s", w.host, target, err)
+
+		return nil, false
+	}
+
+	ok = true
+
+	return
+}
+
+func (w *Worker) _fetch(target *URLContext) (*http.Response, error) {
+	glog.Info("_fetching.")
+	time.Sleep(1 * time.Second)
+	req, err := http.NewRequest("GET", target.url.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if target.sourceURL != nil {
+		req.Header.Add("Referer", target.sourceURL.String())
+	}
+
+	req.Header.Add("User-Agent", w.opts.UserAgent)
+	return HttpClient.Do(req)
+}
+
+func (w *Worker) visitURL(target *URLContext, res *http.Response) interface{} {
+	glog.Info("visiting URL")
+
+	var doc *goquery.Document
+
+	if body, err := ioutil.ReadAll(res.Body); err != nil {
+		glog.Errorf("Error reading body %s: %s", target.url, err)
+		return nil
+	} else if node, err := html.Parse(bytes.NewBuffer(body)); err != nil {
+		glog.Errorf("Error parsing %s: %s", target.url, err)
+		return nil
+	} else {
+		doc = goquery.NewDocumentFromNode(node)
+		doc.Url = target.url
+	}
+
+	// res.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+
+	if doc != nil {
+		links := w.processLinks(target, doc)
+		glog.Infof("Sending to enqueue, length=%d", len(links))
+		w.enqueue <- urlsToURLContexts(links, target.url)
+	}
+
+	w.visited(target)
+
+	return doc
+}
+
+func (w *Worker) processLinks(target *URLContext, doc *goquery.Document) (result []*url.URL) {
+	// <base> html tag for relative URLs.
+	glog.Info("Processing links")
+
 	baseUrl, _ := doc.Find("base[href]").Attr("href")
 
 	urls := doc.Find("a[href]").Map(func(_ int, s *goquery.Selection) string {
@@ -86,7 +180,7 @@ func (w *Worker) processLinks(target url.URL, doc *goquery.Document) (result []*
 		}
 
 		if baseUrl != "" {
-			val = handleBaseTag(&target, baseUrl, val)
+			val = handleBaseTag(target, baseUrl, val)
 		}
 
 		return val
@@ -103,87 +197,30 @@ func (w *Worker) processLinks(target url.URL, doc *goquery.Document) (result []*
 		}
 	}
 
+	//glog.Infof("%v", result)
+
 	return
 }
 
-func (w *Worker) visited(target url.URL) {
+func (w *Worker) visited(target *URLContext) {
 }
 
-func (w *Worker) visitURL(target url.URL, res *http.Response) interface{} {
-	var doc *goquery.Document
+func (w *Worker) enqueueSingle(raw string, source *URLContext) {
+	ctx, err := stringToURLContext(raw, source.url)
 
-	if body, err := ioutil.ReadAll(res.Body); err != nil {
-		glog.Errorf("Error reading body %s: %s", target, err)
-		return nil
-	} else if node, err := html.Parse(bytes.NewBuffer(body)); err != nil {
-		glog.Errorf("Error parsing %s: %s", target, err)
-		return nil
-	} else {
-		doc = goquery.NewDocumentFromNode(node)
-		doc.Url = &target
-	}
-
-	// res.Body = ioutil.NopCloser(bytes.NewBuffer(body))
-
-	if doc != nil {
-		w.processLinks(target, doc)
-	}
-
-	w.visited(target)
-
-	return doc
-}
-
-// crawl function calls fetch to fetch remote web page then process the data
-func (w *Worker) crawl(target url.URL) {
-	if res, ok := w.fetch(target); ok {
-		// handle fetched web page
-		defer res.Body.Close()
-
-		// success
-		if res.StatusCode >= 200 && res.StatusCode < 300 {
-		} else {
-			// Error
-			glog.Errorf("Error status code for %s: %s", target, res.Status)
-		}
-	}
-}
-
-func (w *Worker) _fetch(target url.URL) (*http.Response, error) {
-	req, err := http.NewRequest("GET", target.String(), nil)
 	if err != nil {
-		return nil, err
+		return
 	}
 
-	req.Header.Add("User-Agent", w.opts.UserAgent)
-	return HttpClient.Do(req)
+	w.enqueue <- []*URLContext{ctx}
 }
 
-func (w *Worker) fetch(target url.URL) (res *http.Response, ok bool) {
-	for {
-		if _, err := w._fetch(target); err != nil {
-			if ue, ok := err.(*url.Error); ok {
-				// We do not let http client to handle redirection.
-				// Manually handling redirection would make sure all requests
-				// are following crawler's policy
-				if ue.Err == ErrEnqueueRedirect {
-					w.enqueue <- ue.URL
-				}
-			}
-
-			glog.Errorf("Error while fetching %s: %s", target, err)
-
-			return nil, false
-		}
-
-		ok = true
-	}
-
-	return
+func (w *Worker) push(link *URLContext) {
+	w.incoming.stack(link)
 }
 
-func handleBaseTag(root *url.URL, baseHref string, aHref string) string {
-	resolvedBase, err := root.Parse(baseHref)
+func handleBaseTag(root *URLContext, baseHref string, aHref string) string {
+	resolvedBase, err := root.url.Parse(baseHref)
 	if err != nil {
 		return ""
 	}
