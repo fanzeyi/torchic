@@ -51,7 +51,6 @@ type Worker struct {
 
 var (
 	ErrEnqueueRedirect = errors.New("Redirection not followed")
-	ErrTooFastRequest  = errors.New("Too fast crawling from this site.")
 )
 
 var HttpClient = &http.Client{
@@ -114,11 +113,6 @@ func (w *Worker) fetchURL(target *URLContext) (res *http.Response, ok bool) {
 			}
 		}
 
-		if err == ErrTooFastRequest {
-			w.incoming.stack(target)
-			slient = true
-		}
-
 		if !slient {
 			glog.Errorf("#%d Error while fetching %s: %s", w.id, target.normalizedURL, err)
 		}
@@ -177,11 +171,10 @@ func (w *Worker) markCrawlTime(target *URLContext) {
 }
 
 func (w *Worker) _fetch(target *URLContext) (*http.Response, error) {
-	if diff := w.checkCrawlFrequency(target); diff != 0 {
+	if diff := w.checkCrawlFrequency(target); diff > 0 {
 		wait := time.After(time.Duration(diff) * time.Second)
 		glog.Infof("Wait for %d seconds", diff)
 		<-wait
-		//return nil, ErrTooFastRequest
 	}
 
 	defer w.markCrawlTime(target)
@@ -218,6 +211,10 @@ func (w *Worker) visitURL(target *URLContext, res *http.Response) interface{} {
 	// res.Body = ioutil.NopCloser(bytes.NewBuffer(body))
 
 	if doc != nil {
+		// skip page explicity states non-English
+		if lang, exist := doc.Find("html").Attr("lang"); exist && !strings.HasPrefix(lang, "en") {
+			return nil
+		}
 		links := w.processLinks(target, doc)
 		glog.Infof("Sending to enqueue, length=%d", len(links))
 		w.enqueue <- urlsToURLContexts(links, target.url)

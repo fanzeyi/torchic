@@ -58,7 +58,7 @@ func (c *Crawler) enqueueUrls(links []*URLContext) {
 
 	for _, link := range links {
 		if c.hasVisited(link) {
-			glog.Infof("Ignored on visited: %s", link.normalizedURL)
+			//glog.Infof("Ignored on visited: %s", link.normalizedURL)
 			continue
 		}
 		c.dispatch(link)
