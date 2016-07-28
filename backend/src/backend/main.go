@@ -9,7 +9,6 @@ import (
 	"os/signal"
 	"runtime"
 	"syscall"
-	"time"
 
 	"github.com/golang/glog"
 )
@@ -25,6 +24,9 @@ func main() {
 	}()
 	signal.Notify(sigChan, syscall.SIGQUIT)
 
+	exitSignal := make(chan os.Signal)
+	signal.Notify(exitSignal, syscall.SIGINT, syscall.SIGTERM)
+
 	flag.Parse()
 
 	glog.Info("Prepare to repel boarders")
@@ -33,10 +35,8 @@ func main() {
 
 	//crawler.Start(true)
 	worker := crawler.Crawler{}
-	worker.Run()
+	worker.Run(10)
 	worker.Push("https://catsgobark:nichijou@_.zr.is/")
 
-	for {
-		time.Sleep(100)
-	}
+	<-exitSignal
 }

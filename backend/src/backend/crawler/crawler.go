@@ -3,6 +3,7 @@ package crawler
 import (
 	"backend/redis"
 	"fmt"
+	"hash/fnv"
 
 	"github.com/golang/glog"
 )
@@ -20,19 +21,26 @@ const (
 type Crawler struct {
 	enqueue chan []*URLContext
 
-	// map [host] -> worker
-	workers map[string]*Worker
-	visited map[string]bool
+	visited    map[string]bool
+	workers    []*Worker
+	maxWorkers uint32
 }
 
-func (c *Crawler) Run() {
-	c.init()
+func (c *Crawler) Run(numOfWorkers uint32) {
+	c.init(numOfWorkers)
 	go c.run()
 }
 
-func (c *Crawler) init() {
+func (c *Crawler) init(numOfWorkers uint32) {
 	c.enqueue = make(chan []*URLContext, 10)
-	c.workers = make(map[string]*Worker)
+	c.workers = make([]*Worker, numOfWorkers)
+	c.maxWorkers = numOfWorkers
+
+	var i uint32
+
+	for i = 0; i < numOfWorkers; i++ {
+		c.workers[i] = c.launchWorker(i)
+	}
 }
 
 // Crawler runloop
@@ -46,8 +54,7 @@ func (c *Crawler) run() {
 }
 
 func (c *Crawler) enqueueUrls(links []*URLContext) {
-	glog.Info("received from enqueue")
-	glog.Infof("received %v", links)
+	glog.Infof("Enqueue received %d links", len(links))
 
 	for _, link := range links {
 		if c.hasVisited(link) {
@@ -56,8 +63,6 @@ func (c *Crawler) enqueueUrls(links []*URLContext) {
 		}
 		c.dispatch(link)
 	}
-
-	glog.Info("Dispatch end")
 }
 
 func (c *Crawler) hasVisited(link *URLContext) bool {
@@ -85,33 +90,32 @@ func (c *Crawler) setVisited(link *URLContext) {
 	}
 }
 
+func hash(raw string) uint32 {
+	h := fnv.New32a()
+	h.Write([]byte(raw))
+	return h.Sum32()
+}
+
 func (c *Crawler) dispatch(link *URLContext) {
 	//glog.Infof("Dispatching %s", link.normalizedURL.String())
-	worker, ok := c.workers[link.NormalizedURL().Host]
+	dest := hash(link.NormalizedURL().Host) % c.maxWorkers
 
-	if !ok {
-		worker = c.launchWorker(link)
-	}
-
-	worker.push(link)
-
+	c.workers[dest].push(link)
 	c.setVisited(link)
 }
 
-func (c *Crawler) launchWorker(link *URLContext) *Worker {
-	glog.Infof("Launching worker for %s", link.normalizedURL.Host)
+func (c *Crawler) launchWorker(no uint32) *Worker {
+	glog.Infof("Launching worker #%d", no)
 	//incoming := make(chan *URLContext)
 
 	w := &Worker{
-		host:     link.normalizedURL.Host,
+		id:       no,
 		incoming: newPopChannel(),
 		enqueue:  c.enqueue,
 		opts: &Options{
 			UserAgent: DefaultUserAgent,
 		},
 	}
-
-	c.workers[link.normalizedURL.Host] = w
 
 	go w.run()
 

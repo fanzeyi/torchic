@@ -26,20 +26,17 @@ type Options struct {
 }
 
 type Worker struct {
-	host string
+	id uint32
 
 	// == channels
 	// incomming channel is where the jobs coming in
 	incoming popChannel
-	//pop      popChannel
 
 	// stop channel is where the worker receives its stop signal
 	stop chan int
 
 	// enqueue
 	enqueue chan<- []*URLContext
-
-	timeout *time.Time
 
 	opts *Options
 }
@@ -56,7 +53,7 @@ var HttpClient = &http.Client{
 
 func (w *Worker) run() {
 	defer func() {
-		glog.Infof("Worker(%s) done.", w.host)
+		glog.Infof("Worker#%d done.", w.id)
 	}()
 
 	for {
@@ -92,7 +89,7 @@ func (w *Worker) crawl(target *URLContext) {
 }
 
 func (w *Worker) fetchURL(target *URLContext) (res *http.Response, ok bool) {
-	glog.Infof("Fetching URL: %s", target.normalizedURL.String())
+	glog.Infof("#%d Fetching URL: %s", w.id, target.normalizedURL.String())
 
 	var err error
 
@@ -107,7 +104,7 @@ func (w *Worker) fetchURL(target *URLContext) (res *http.Response, ok bool) {
 			}
 		}
 
-		glog.Errorf("%s Error while fetching %s: %s", w.host, target.normalizedURL, err)
+		glog.Errorf("#%d Error while fetching %s: %s", w.id, target.normalizedURL, err)
 
 		return nil, false
 	}
@@ -118,7 +115,6 @@ func (w *Worker) fetchURL(target *URLContext) (res *http.Response, ok bool) {
 }
 
 func (w *Worker) _fetch(target *URLContext) (*http.Response, error) {
-	glog.Info("_fetching.")
 	time.Sleep(1 * time.Second)
 	req, err := http.NewRequest("GET", target.url.String(), nil)
 	if err != nil {
@@ -134,8 +130,6 @@ func (w *Worker) _fetch(target *URLContext) (*http.Response, error) {
 }
 
 func (w *Worker) visitURL(target *URLContext, res *http.Response) interface{} {
-	glog.Info("visiting URL")
-
 	var doc *goquery.Document
 
 	if body, err := ioutil.ReadAll(res.Body); err != nil {
@@ -164,8 +158,6 @@ func (w *Worker) visitURL(target *URLContext, res *http.Response) interface{} {
 
 func (w *Worker) processLinks(target *URLContext, doc *goquery.Document) (result []*url.URL) {
 	// <base> html tag for relative URLs.
-	glog.Info("Processing links")
-
 	baseUrl, _ := doc.Find("base[href]").Attr("href")
 
 	urls := doc.Find("a[href]").Map(func(_ int, s *goquery.Selection) string {
