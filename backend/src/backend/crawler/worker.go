@@ -6,6 +6,7 @@
 package crawler
 
 import (
+	"backend/redis"
 	"bytes"
 	"errors"
 	"io/ioutil"
@@ -18,7 +19,14 @@ import (
 	"golang.org/x/net/html"
 
 	"github.com/PuerkitoBio/goquery"
+	redigo "github.com/garyburd/redigo/redis"
 	"github.com/golang/glog"
+)
+
+const (
+	CrawlDelayPrefix  = "CrawlDelay"
+	DefaultCrawlDelay = 1
+	LastCrawlPrefix   = "LastCrawl"
 )
 
 type Options struct {
@@ -28,21 +36,22 @@ type Options struct {
 type Worker struct {
 	id uint32
 
-	// == channels
 	// incomming channel is where the jobs coming in
 	incoming popChannel
 
 	// stop channel is where the worker receives its stop signal
 	stop chan int
 
-	// enqueue
+	// enqueue is where the worker pushs links retrieved from current page
+	// to coordinator
 	enqueue chan<- []*URLContext
 
 	opts *Options
 }
 
 var (
-	ErrEnqueueRedirect = errors.New("redirection not followed")
+	ErrEnqueueRedirect = errors.New("Redirection not followed")
+	ErrTooFastRequest  = errors.New("Too fast crawling from this site.")
 )
 
 var HttpClient = &http.Client{
@@ -73,7 +82,7 @@ func (w *Worker) run() {
 
 // crawl function calls fetch to fetch remote web page then process the data
 func (w *Worker) crawl(target *URLContext) {
-	glog.Infof("Crawling URL: %s", target.normalizedURL.String())
+	//glog.Infof("Crawling URL: %s", target.normalizedURL.String())
 	if res, ok := w.fetchURL(target); ok {
 		// handle fetched web page
 		defer res.Body.Close()
@@ -89,22 +98,30 @@ func (w *Worker) crawl(target *URLContext) {
 }
 
 func (w *Worker) fetchURL(target *URLContext) (res *http.Response, ok bool) {
-	glog.Infof("#%d Fetching URL: %s", w.id, target.normalizedURL.String())
-
 	var err error
 
 	if res, err = w._fetch(target); err != nil {
+		slient := false
+
 		if ue, ok := err.(*url.Error); ok {
 			// We do not let http client to handle redirection.
 			// Manually handling redirection would make sure all requests
 			// are following crawler's policy
 			if ue.Err == ErrEnqueueRedirect {
-				w.enqueueSingle(ue.URL, target)
+				w.enqueueSingleString(ue.URL, target)
 				glog.Warningf("Enqueuing redirection: %s", ue.URL)
+				slient = true
 			}
 		}
 
-		glog.Errorf("#%d Error while fetching %s: %s", w.id, target.normalizedURL, err)
+		if err == ErrTooFastRequest {
+			w.incoming.stack(target)
+			slient = true
+		}
+
+		if !slient {
+			glog.Errorf("#%d Error while fetching %s: %s", w.id, target.normalizedURL, err)
+		}
 
 		return nil, false
 	}
@@ -114,8 +131,63 @@ func (w *Worker) fetchURL(target *URLContext) (res *http.Response, ok bool) {
 	return
 }
 
+func (w *Worker) checkCrawlFrequency(target *URLContext) int64 {
+	conn := redis.GetConn()
+	defer conn.Close()
+
+	var key string
+
+	key = redis.BuildKey(CrawlDelayPrefix, "%s", target.NormalizedURL().Host)
+	delay, err := redigo.Int64(conn.Do("GET", key))
+
+	if err != nil && err != redigo.ErrNil {
+		glog.Errorf("Error while retrieving redis key %s, %s", key, err)
+		return 0
+	} else if err == redigo.ErrNil {
+		delay = 1
+	}
+
+	key = redis.BuildKey(LastCrawlPrefix, "%s", target.NormalizedURL().Host)
+	last, err := redigo.Int64(conn.Do("GET", key))
+
+	if err != nil && err != redigo.ErrNil {
+		glog.Errorf("Error while retrieving redis key %s, %s", key, err)
+		return 0
+	} else if err == redigo.ErrNil {
+		return 0
+	}
+
+	// UNIX ts, unit: second
+	current := time.Now().Unix()
+
+	//glog.Infof("current: %d last: %d delay: %d", current, last, delay)
+
+	return (last + delay) - current
+}
+
+func (w *Worker) markCrawlTime(target *URLContext) {
+	conn := redis.GetConn()
+
+	key := redis.BuildKey(LastCrawlPrefix, "%s", target.NormalizedURL().Host)
+	_, err := conn.Do("SET", key, time.Now().Unix())
+
+	if err != nil {
+		glog.Errorf("Error while setting redis key %s, %s", key, err)
+	}
+}
+
 func (w *Worker) _fetch(target *URLContext) (*http.Response, error) {
-	time.Sleep(1 * time.Second)
+	if diff := w.checkCrawlFrequency(target); diff != 0 {
+		wait := time.After(time.Duration(diff) * time.Second)
+		glog.Infof("Wait for %d seconds", diff)
+		<-wait
+		//return nil, ErrTooFastRequest
+	}
+
+	defer w.markCrawlTime(target)
+
+	glog.Infof("#%d Fetching URL: %s", w.id, target.normalizedURL.String())
+
 	req, err := http.NewRequest("GET", target.url.String(), nil)
 	if err != nil {
 		return nil, err
@@ -193,13 +265,17 @@ func (w *Worker) processLinks(target *URLContext, doc *goquery.Document) (result
 func (w *Worker) visited(target *URLContext) {
 }
 
-func (w *Worker) enqueueSingle(raw string, source *URLContext) {
+func (w *Worker) enqueueSingleString(raw string, source *URLContext) {
 	ctx, err := stringToURLContext(raw, source.url)
 
 	if err != nil {
 		return
 	}
 
+	w.enqueueSingle(ctx)
+}
+
+func (w *Worker) enqueueSingle(ctx *URLContext) {
 	w.enqueue <- []*URLContext{ctx}
 }
 

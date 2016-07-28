@@ -13,7 +13,7 @@ const (
 )
 
 const (
-	visitedPrefix = "visited"
+	visitedPrefix = "Visited"
 	// (unit: second) 7200 seconds = 2 hour
 	visitedExpireTime = 7200
 )
@@ -54,7 +54,7 @@ func (c *Crawler) run() {
 }
 
 func (c *Crawler) enqueueUrls(links []*URLContext) {
-	glog.Infof("Enqueue received %d links", len(links))
+	count := 0
 
 	for _, link := range links {
 		if c.hasVisited(link) {
@@ -62,7 +62,10 @@ func (c *Crawler) enqueueUrls(links []*URLContext) {
 			continue
 		}
 		c.dispatch(link)
+		count += 1
 	}
+
+	glog.Infof("Enqueue received %d links", count)
 }
 
 func (c *Crawler) hasVisited(link *URLContext) bool {
@@ -76,7 +79,7 @@ func (c *Crawler) hasVisited(link *URLContext) bool {
 		return false
 	}
 
-	return res != nil
+	return res != nil // || link.NormalizedURL().Host != "en.wikipedia.org"
 }
 
 func (c *Crawler) setVisited(link *URLContext) {

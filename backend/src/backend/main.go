@@ -9,11 +9,10 @@ import (
 	"os/signal"
 	"runtime"
 	"syscall"
-
-	"github.com/golang/glog"
 )
 
 func main() {
+
 	sigChan := make(chan os.Signal)
 	go func() {
 		stacktrace := make([]byte, 8192)
@@ -29,14 +28,13 @@ func main() {
 
 	flag.Parse()
 
-	glog.Info("Prepare to repel boarders")
-
 	redis.Init(REDIS_HOST, REDIS_PORT, REDIS_PASSWORD)
 
 	//crawler.Start(true)
 	worker := crawler.Crawler{}
 	worker.Run(10)
-	worker.Push("https://catsgobark:nichijou@_.zr.is/")
+	//worker.Push("https://catsgobark:nichijou@_.zr.is/")
+	worker.Push("https://en.wikipedia.org/")
 
 	<-exitSignal
 }

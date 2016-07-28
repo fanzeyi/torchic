@@ -43,3 +43,7 @@ func Init(host, port, password string) {
 func GetConn() redis.Conn {
 	return pool.Get()
 }
+
+func BuildKey(prefix, format string, a ...interface{}) string {
+	return fmt.Sprintf(fmt.Sprintf("%s:%s", prefix, format), a)
+}
