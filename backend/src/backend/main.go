@@ -34,7 +34,7 @@ func main() {
 	//crawler.Start(true)
 	worker := crawler.Crawler{}
 	worker.Run()
-	worker.Push("https://en.wikipedia.org/wiki/SS_Washingtonian_(1913)")
+	worker.Push("https://catsgobark:nichijou@_.zr.is/")
 
 	for {
 		time.Sleep(100)

@@ -1,9 +1,20 @@
 package crawler
 
-import "github.com/golang/glog"
+import (
+	"backend/redis"
+	"fmt"
+
+	"github.com/golang/glog"
+)
 
 const (
 	DefaultUserAgent = "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"
+)
+
+const (
+	visitedPrefix = "visited"
+	// (unit: second) 7200 seconds = 2 hour
+	visitedExpireTime = 7200
 )
 
 type Crawler struct {
@@ -13,34 +24,6 @@ type Crawler struct {
 	workers map[string]*Worker
 	visited map[string]bool
 }
-
-//func StartWorker() {
-//incoming := make(chan *url.URL)
-//enqueue := make(chan []*url.URL)
-
-//w := &Worker{
-//id:       "1",
-//host:     "en.wikipedia.org",
-//incoming: incoming,
-//enqueue:  enqueue,
-//opts: &Options{
-//UserAgent: "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
-//},
-//}
-
-//go w.run()
-
-//u, _ := url.Parse("https://en.wikipedia.org/wiki/SS_Washingtonian_(1913)")
-
-//incoming <- u
-
-//for {
-//select {
-//case links := <-enqueue:
-//glog.Infof("Received links: %v", links)
-//}
-//}
-//}
 
 func (c *Crawler) Run() {
 	c.init()
@@ -57,21 +40,53 @@ func (c *Crawler) run() {
 	for {
 		select {
 		case links := <-c.enqueue:
-			glog.Info("received from enqueue")
-			glog.Infof("received %v", links)
-			for _, link := range links {
-				c.dispatch(link)
-			}
-
-			glog.Info("Dispatch end")
+			c.enqueueUrls(links)
 		}
+	}
+}
 
-		glog.Infof("%d", len(c.enqueue))
+func (c *Crawler) enqueueUrls(links []*URLContext) {
+	glog.Info("received from enqueue")
+	glog.Infof("received %v", links)
+
+	for _, link := range links {
+		if c.hasVisited(link) {
+			glog.Infof("Ignored on visited: %s", link.normalizedURL)
+			continue
+		}
+		c.dispatch(link)
+	}
+
+	glog.Info("Dispatch end")
+}
+
+func (c *Crawler) hasVisited(link *URLContext) bool {
+	conn := redis.GetConn()
+	defer conn.Close()
+
+	res, err := conn.Do("GET", fmt.Sprintf("%s:%s", visitedPrefix, link.normalizedURL.String()))
+
+	if err != nil {
+		glog.Errorf("Error when redis GET: %s", err)
+		return false
+	}
+
+	return res != nil
+}
+
+func (c *Crawler) setVisited(link *URLContext) {
+	conn := redis.GetConn()
+	defer conn.Close()
+
+	_, err := conn.Do("SETEX", fmt.Sprintf("%s:%s", visitedPrefix, link.normalizedURL.String()), visitedExpireTime, true)
+
+	if err != nil {
+		glog.Errorf("Error when redis SETNX: %s", err)
 	}
 }
 
 func (c *Crawler) dispatch(link *URLContext) {
-	glog.Infof("Dispatching %s", link.normalizedURL.String())
+	//glog.Infof("Dispatching %s", link.normalizedURL.String())
 	worker, ok := c.workers[link.NormalizedURL().Host]
 
 	if !ok {
@@ -79,6 +94,8 @@ func (c *Crawler) dispatch(link *URLContext) {
 	}
 
 	worker.push(link)
+
+	c.setVisited(link)
 }
 
 func (c *Crawler) launchWorker(link *URLContext) *Worker {

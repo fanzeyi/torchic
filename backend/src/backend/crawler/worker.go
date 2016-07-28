@@ -71,8 +71,6 @@ func (w *Worker) run() {
 				w.crawl(ctx)
 			}
 		}
-
-		glog.Info(".")
 	}
 }
 
@@ -88,7 +86,7 @@ func (w *Worker) crawl(target *URLContext) {
 			w.visitURL(target, res)
 		} else {
 			// Error
-			glog.Errorf("Error status code for %s: %s", target, res.Status)
+			glog.Errorf("Error status code for %s: %s", target.normalizedURL, res.Status)
 		}
 	}
 }
@@ -109,7 +107,7 @@ func (w *Worker) fetchURL(target *URLContext) (res *http.Response, ok bool) {
 			}
 		}
 
-		glog.Errorf("%s Error while fetching %s: %s", w.host, target, err)
+		glog.Errorf("%s Error while fetching %s: %s", w.host, target.normalizedURL, err)
 
 		return nil, false
 	}
@@ -196,8 +194,6 @@ func (w *Worker) processLinks(target *URLContext, doc *goquery.Document) (result
 			}
 		}
 	}
-
-	//glog.Infof("%v", result)
 
 	return
 }
