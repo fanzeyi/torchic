@@ -7,6 +7,7 @@ package crawler
 
 import (
 	"backend/redis"
+	"backend/utils"
 	"bytes"
 	"errors"
 	"io/ioutil"
@@ -37,7 +38,9 @@ type Worker struct {
 	id uint32
 
 	// incomming channel is where the jobs coming in
-	incoming popChannel
+	incoming utils.PopChannel
+
+	outgoing *utils.PopChannel
 
 	// stop channel is where the worker receives its stop signal
 	stop chan int
@@ -73,7 +76,7 @@ func (w *Worker) run() {
 			return
 		case jobs := <-w.incoming:
 			for _, ctx := range jobs {
-				w.crawl(ctx)
+				w.crawl(ctx.(*URLContext))
 			}
 		}
 	}
@@ -194,15 +197,15 @@ func (w *Worker) _fetch(target *URLContext) (*http.Response, error) {
 	return HttpClient.Do(req)
 }
 
-func (w *Worker) visitURL(target *URLContext, res *http.Response) interface{} {
+func (w *Worker) visitURL(target *URLContext, res *http.Response) {
 	var doc *goquery.Document
 
 	if body, err := ioutil.ReadAll(res.Body); err != nil {
 		glog.Errorf("Error reading body %s: %s", target.url, err)
-		return nil
+		return
 	} else if node, err := html.Parse(bytes.NewBuffer(body)); err != nil {
 		glog.Errorf("Error parsing %s: %s", target.url, err)
-		return nil
+		return
 	} else {
 		doc = goquery.NewDocumentFromNode(node)
 		doc.Url = target.url
@@ -213,7 +216,7 @@ func (w *Worker) visitURL(target *URLContext, res *http.Response) interface{} {
 	if doc != nil {
 		// skip page explicity states non-English
 		if lang, exist := doc.Find("html").Attr("lang"); exist && !strings.HasPrefix(lang, "en") {
-			return nil
+			return
 		}
 		links := w.processLinks(target, doc)
 		glog.Infof("Sending to enqueue, length=%d", len(links))
@@ -222,7 +225,9 @@ func (w *Worker) visitURL(target *URLContext, res *http.Response) interface{} {
 
 	w.visited(target)
 
-	return doc
+	w.sendResponse(target, doc)
+
+	return
 }
 
 func (w *Worker) processLinks(target *URLContext, doc *goquery.Document) (result []*url.URL) {
@@ -277,7 +282,16 @@ func (w *Worker) enqueueSingle(ctx *URLContext) {
 }
 
 func (w *Worker) push(link *URLContext) {
-	w.incoming.stack(link)
+	w.incoming.Stack(link)
+}
+
+func (w *Worker) sendResponse(link *URLContext, document *goquery.Document) {
+	resp := &CrawlResponse{
+		Document: document,
+		Link:     link,
+	}
+
+	w.outgoing.Stack(resp)
 }
 
 func handleBaseTag(root *URLContext, baseHref string, aHref string) string {

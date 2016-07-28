@@ -2,9 +2,11 @@ package crawler
 
 import (
 	"backend/redis"
+	"backend/utils"
 	"fmt"
 	"hash/fnv"
 
+	"github.com/PuerkitoBio/goquery"
 	"github.com/golang/glog"
 )
 
@@ -18,17 +20,26 @@ const (
 	visitedExpireTime = 7200
 )
 
+type CrawlResponse struct {
+	Document *goquery.Document
+	Link     *URLContext
+}
+
 type Crawler struct {
-	enqueue chan []*URLContext
+	enqueue  chan []*URLContext
+	outgoing *utils.PopChannel
 
 	visited    map[string]bool
 	workers    []*Worker
 	maxWorkers uint32
 }
 
-func (c *Crawler) Run(numOfWorkers uint32) {
-	c.init(numOfWorkers)
-	go c.run()
+func NewCrawler(numOfWorkers uint32, outgoing *utils.PopChannel) *Crawler {
+	crawler := new(Crawler)
+	crawler.outgoing = outgoing
+	crawler.init(numOfWorkers)
+
+	return crawler
 }
 
 func (c *Crawler) init(numOfWorkers uint32) {
@@ -44,7 +55,7 @@ func (c *Crawler) init(numOfWorkers uint32) {
 }
 
 // Crawler runloop
-func (c *Crawler) run() {
+func (c *Crawler) Run() {
 	for {
 		select {
 		case links := <-c.enqueue:
@@ -113,7 +124,8 @@ func (c *Crawler) launchWorker(no uint32) *Worker {
 
 	w := &Worker{
 		id:       no,
-		incoming: newPopChannel(),
+		incoming: utils.NewPopChannel(),
+		outgoing: c.outgoing,
 		enqueue:  c.enqueue,
 		opts: &Options{
 			UserAgent: DefaultUserAgent,

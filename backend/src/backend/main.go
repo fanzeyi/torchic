@@ -2,7 +2,9 @@ package main
 
 import (
 	"backend/crawler"
+	"backend/index"
 	"backend/redis"
+	"backend/utils"
 	"flag"
 	"fmt"
 	"os"
@@ -30,11 +32,14 @@ func main() {
 
 	redis.Init(REDIS_HOST, REDIS_PORT, REDIS_PASSWORD)
 
-	//crawler.Start(true)
-	worker := crawler.Crawler{}
-	worker.Run(10)
-	//worker.Push("https://catsgobark:nichijou@_.zr.is/")
+	crawlRespChan := utils.NewPopChannel()
+
+	worker := crawler.NewCrawler(10, &crawlRespChan)
+	go worker.Run()
 	worker.Push("https://en.wikipedia.org/")
+
+	indexer := index.NewIndexer(&crawlRespChan)
+	go indexer.Run()
 
 	<-exitSignal
 }

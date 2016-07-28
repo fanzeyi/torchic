@@ -52,6 +52,12 @@
 			"branch": "master"
 		},
 		{
+			"importpath": "github.com/kljensen/snowball",
+			"repository": "https://github.com/kljensen/snowball",
+			"revision": "eccb3014a653352f4f9969f416b9b3cc3605a6ef",
+			"branch": "master"
+		},
+		{
 			"importpath": "github.com/temoto/robotstxt.go",
 			"repository": "https://github.com/temoto/robotstxt.go",
 			"revision": "99f6b48954d8cafb2f10790957aa747ca7aeb530",

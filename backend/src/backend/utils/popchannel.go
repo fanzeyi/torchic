@@ -1,20 +1,20 @@
-package crawler
+package utils
 
 // The pop channel is a stacked channel used by workers to pop the next URL(s)
 // to process.
-type popChannel chan []*URLContext
+type PopChannel chan []interface{}
 
 // Constructor to create and initialize a popChannel
-func newPopChannel() popChannel {
+func NewPopChannel() PopChannel {
 	// The pop channel is stacked, so only a buffer of 1 is required
 	// see http://gowithconfidence.tumblr.com/post/31426832143/stacked-channels
-	return make(chan []*URLContext, 1)
+	return make(chan []interface{}, 1)
 }
 
 // The stack function ensures the specified URLs are added to the pop channel
 // with minimal blocking (since the channel is stacked, it is virtually equivalent
 // to an infinitely buffered channel).
-func (pc popChannel) stack(cmd ...*URLContext) {
+func (pc PopChannel) Stack(cmd ...interface{}) {
 	toStack := cmd
 	for {
 		select {
