@@ -12,7 +12,7 @@ const (
 )
 
 const (
-	URLNormalizationFlags = purell.FlagsAllGreedy
+	URLNormalizationFlags = purell.FlagsUsuallySafeGreedy | purell.FlagSortQuery | purell.FlagRemoveFragment | purell.FlagRemoveDirectoryIndex
 )
 
 type URLContext struct {
