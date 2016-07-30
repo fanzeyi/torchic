@@ -16,8 +16,11 @@ import (
 )
 
 const (
-	TermPrefix = "term"
-	UrlPrefix  = "url"
+	TermPrefix        = "term"
+	UrlPrefix         = "url"
+	CountPrefix       = "count"
+	TermSetKey        = "terms"
+	TotalDocumentsKey = "total_documents"
 )
 
 type Indexer struct {
@@ -142,11 +145,8 @@ func (i Indexer) index(link *crawler.URLContext, words []string) {
 
 	count = make(map[string]uint)
 
-	var total uint
-
 	for _, word := range words {
 		count[word] += 1
-		total += 1
 	}
 
 	c := redis.GetConn()
@@ -158,11 +158,19 @@ func (i Indexer) index(link *crawler.URLContext, words []string) {
 	sadd = append(sadd, redis.BuildKey(UrlPrefix, "%s", link.URL().String()))
 
 	for word, num := range count {
-		c.Send("ZADD", redis.BuildKey(TermPrefix, "%s", word), float32(num)/float32(total), link.URL().String())
+		c.Send("ZADD", redis.BuildKey(TermPrefix, "%s", word), num, link.URL().String())
 		sadd = append(sadd, word)
 	}
 
-	c.Send("SADD", sadd...)
+	if len(sadd) > 1 {
+		c.Send("SADD", sadd...)
+
+		sadd[0] = TermSetKey
+		c.Send("SADD", sadd...)
+	}
+
+	c.Send("SET", redis.BuildKey(CountPrefix, "%s", link.URL().String()), len(count))
+	c.Send("INCR", TotalDocumentsKey)
 
 	_, err := c.Do("EXEC")
 
