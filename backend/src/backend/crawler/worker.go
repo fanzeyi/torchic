@@ -30,12 +30,16 @@ const (
 	LastCrawlPrefix   = "LastCrawl"
 )
 
+const (
+	workerQueue = "workerQueue"
+)
+
 type Options struct {
 	UserAgent string
 }
 
 type Worker struct {
-	id uint32
+	id string
 
 	// incomming channel is where the jobs coming in
 	incoming utils.PopChannel
@@ -47,7 +51,7 @@ type Worker struct {
 
 	// enqueue is where the worker pushs links retrieved from current page
 	// to coordinator
-	enqueue chan<- []*URLContext
+	enqueue chan<- []*url.URL
 
 	opts *Options
 }
@@ -64,21 +68,43 @@ var HttpClient = &http.Client{
 
 func (w *Worker) run() {
 	defer func() {
-		glog.Infof("Worker#%d done.", w.id)
+		glog.Infof("Worker#%s done.", w.id)
 	}()
 
 	for {
+		conn := redis.GetConn()
 
-		select {
-		case <-w.stop:
-			// clean up and exit
-			glog.Info("Stop signal received.")
-			return
-		case jobs := <-w.incoming:
-			for _, ctx := range jobs {
-				w.crawl(ctx.(*URLContext))
+		key := redis.BuildKey(workerQueue, "%s", w.id)
+		workKey := redis.BuildKey(workerQueue, "%s:working", w.id)
+
+		reply, err := redigo.String(conn.Do("RPOP", workKey))
+
+		if err != nil {
+			// no current working
+			glog.Infof("Reading from %s", key)
+			reply, err = redigo.String(conn.Do("BRPOPLPUSH", key, workKey, 10))
+
+			if err != nil {
+				// no work received
+				glog.Errorf("Error: %s", err)
+				conn.Close()
+				time.Sleep(1 * time.Second)
+				continue
 			}
 		}
+
+		// release conn to redis while crawling
+		conn.Close()
+
+		ctx := deserializeURLContext(reply)
+
+		w.crawl(ctx)
+
+		conn = redis.GetConn()
+		defer conn.Close()
+
+		// Work done.
+		conn.Do("RPOP", workKey)
 	}
 }
 
@@ -110,6 +136,7 @@ func (w *Worker) fetchURL(target *URLContext) (res *http.Response, ok bool) {
 			// Manually handling redirection would make sure all requests
 			// are following crawler's policy
 			if ue.Err == ErrEnqueueRedirect {
+				// CONCERN: ue.URL might be relative? Need confirm
 				w.enqueueSingleString(ue.URL, target)
 				glog.Warningf("Enqueuing redirection: %s", ue.URL)
 				slient = true
@@ -117,7 +144,7 @@ func (w *Worker) fetchURL(target *URLContext) (res *http.Response, ok bool) {
 		}
 
 		if !slient {
-			glog.Errorf("#%d Error while fetching %s: %s", w.id, target.normalizedURL, err)
+			glog.Errorf("#%s Error while fetching %s: %s", w.id, target.normalizedURL, err)
 		}
 
 		return nil, false
@@ -182,7 +209,7 @@ func (w *Worker) _fetch(target *URLContext) (*http.Response, error) {
 
 	defer w.markCrawlTime(target)
 
-	glog.Infof("#%d Fetching URL: %s", w.id, target.normalizedURL.String())
+	glog.Infof("#%s Fetching URL: %s", w.id, target.normalizedURL.String())
 
 	req, err := http.NewRequest("GET", target.url.String(), nil)
 	if err != nil {
@@ -220,7 +247,7 @@ func (w *Worker) visitURL(target *URLContext, res *http.Response) {
 		}
 		links := w.processLinks(target, doc)
 		glog.Infof("Sending to enqueue, length=%d", len(links))
-		w.enqueue <- urlsToURLContexts(links, target.url)
+		w.enqueue <- links
 	}
 
 	w.visited(target)
@@ -268,17 +295,17 @@ func (w *Worker) visited(target *URLContext) {
 }
 
 func (w *Worker) enqueueSingleString(raw string, source *URLContext) {
-	ctx, err := stringToURLContext(raw, source.url)
+	ctx, err := url.Parse(raw)
 
 	if err != nil {
 		return
 	}
 
-	w.enqueueSingle(ctx)
+	w.enqueueSingle(ctx, source.URL())
 }
 
-func (w *Worker) enqueueSingle(ctx *URLContext) {
-	w.enqueue <- []*URLContext{ctx}
+func (w *Worker) enqueueSingle(u, src *url.URL) {
+	w.enqueue <- []*url.URL{src, u}
 }
 
 func (w *Worker) push(link *URLContext) {

@@ -1,10 +1,12 @@
 package crawler
 
 import (
+	"encoding/base64"
 	"net/url"
 	"strings"
 
 	"github.com/PuerkitoBio/purell"
+	"github.com/golang/glog"
 )
 
 const (
@@ -48,6 +50,35 @@ func (uc *URLContext) NormalizedSourceURL() *url.URL {
 // IsRobotsURL indicates if the URL is a robots.txt URL.
 func (uc *URLContext) IsRobotsURL() bool {
 	return isRobotsURL(uc.normalizedURL)
+}
+
+func deserializeURLContext(data string) *URLContext {
+	parts := strings.Split(data, ":")
+	link, err := base64.StdEncoding.DecodeString(parts[0])
+	if err != nil {
+		glog.Errorf("Deserialize failed: %s", err)
+		return nil
+	}
+
+	src, err := base64.StdEncoding.DecodeString(parts[1])
+	if err != nil {
+		glog.Errorf("Deserialize failed: %s", err)
+		return nil
+	}
+
+	u, err := url.Parse(string(link))
+	if err != nil {
+		glog.Errorf("Deserialize failed: %s", err)
+		return nil
+	}
+
+	srcUrl, err := url.Parse(string(src))
+	if err != nil {
+		glog.Errorf("Deserialize failed: %s", err)
+		return urlToURLContext(u, nil)
+	}
+
+	return urlToURLContext(u, srcUrl)
 }
 
 func isRobotsURL(u *url.URL) bool {

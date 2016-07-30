@@ -34,8 +34,8 @@ func main() {
 
 	crawlRespChan := utils.NewPopChannel()
 
-	worker := crawler.NewCrawler(10, &crawlRespChan)
-	go worker.Run()
+	worker := crawler.NewCrawler(1, 10, &crawlRespChan)
+	worker.Run()
 	worker.Push("https://en.wikipedia.org/")
 
 	indexer := index.NewIndexer(&crawlRespChan)
