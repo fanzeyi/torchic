@@ -52,6 +52,23 @@ func (uc *URLContext) IsRobotsURL() bool {
 	return isRobotsURL(uc.normalizedURL)
 }
 
+func (uc *URLContext) getRobotsURLCtx() (*URLContext, error) {
+	robURL, err := uc.normalizedURL.Parse(robotsTxtPath)
+	if err != nil {
+		return nil, err
+	}
+	return &URLContext{
+		robURL,
+		robURL,       // Normalized is same as raw
+		uc.sourceURL, // Source and normalized source is same as for current context
+		uc.normalizedSourceURL,
+	}, nil
+}
+
+func (uc *URLContext) serialize() string {
+	return serializeUrl(uc.url, uc.sourceURL)
+}
+
 func deserializeURLContext(data string) *URLContext {
 	parts := strings.Split(data, ":")
 	link, err := base64.StdEncoding.DecodeString(parts[0])

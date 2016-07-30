@@ -58,6 +58,12 @@
 			"branch": "master"
 		},
 		{
+			"importpath": "github.com/temoto/robotstxt",
+			"repository": "https://github.com/temoto/robotstxt",
+			"revision": "99f6b48954d8cafb2f10790957aa747ca7aeb530",
+			"branch": "master"
+		},
+		{
 			"importpath": "github.com/temoto/robotstxt.go",
 			"repository": "https://github.com/temoto/robotstxt.go",
 			"revision": "99f6b48954d8cafb2f10790957aa747ca7aeb530",
