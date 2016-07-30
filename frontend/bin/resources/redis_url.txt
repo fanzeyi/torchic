@@ -1,1 +1,0 @@
-redis://redistogo:82f3b81788b855ecc82d7122d45cba0a@viperfish.redistogo.com:10626
