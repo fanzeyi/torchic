@@ -83,7 +83,7 @@ func (w *Worker) run() {
 			// no current working
 			if err != redigo.ErrNil {
 				glog.Errorf("[%s] Error while getting work: %s", w.id, err)
-				conn.Close()
+				redis.ReturnConn(conn)
 
 				continue
 			}
@@ -93,27 +93,28 @@ func (w *Worker) run() {
 				// no work received
 				if err != redigo.ErrNil {
 					glog.Errorf("[%s] Error while getting work: %s", w.id, err)
-					conn.Close()
+					redis.ReturnConn(conn)
 					continue
 				}
-				conn.Close()
+				redis.ReturnConn(conn)
 				time.Sleep(1 * time.Second)
 				continue
 			}
 		}
 
 		// release conn to redis while crawling
-		conn.Close()
+		redis.ReturnConn(conn)
 
 		ctx := deserializeURLContext(reply)
 
 		w.crawl(ctx)
 
 		conn = redis.GetConn()
-		defer conn.Close()
 
 		// Work done.
 		conn.Do("RPOP", workKey)
+
+		redis.ReturnConn(conn)
 	}
 }
 
@@ -168,7 +169,7 @@ func (w *Worker) fetchURL(target *URLContext) (res *http.Response, ok bool) {
 
 func (w *Worker) checkCrawlFrequency(target *URLContext) int64 {
 	conn := redis.GetConn()
-	defer conn.Close()
+	defer redis.ReturnConn(conn)
 
 	var key string
 
@@ -202,7 +203,7 @@ func (w *Worker) checkCrawlFrequency(target *URLContext) int64 {
 
 func (w *Worker) markCrawlTime(target *URLContext) {
 	conn := redis.GetConn()
-	defer conn.Close()
+	defer redis.ReturnConn(conn)
 
 	key := redis.BuildKey(LastCrawlPrefix, "%s", target.NormalizedURL().Host)
 	_, err := conn.Do("SET", key, time.Now().Unix())

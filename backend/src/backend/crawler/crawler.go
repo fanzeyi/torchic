@@ -73,7 +73,7 @@ func (c *Crawler) Run() {
 
 func (c *Crawler) coordinatorRun() {
 	conn := redis.GetConn()
-	defer conn.Close()
+	defer redis.ReturnConn(conn)
 
 	for {
 		key := redis.BuildKey(crawlQueue, "%d", c.id)
@@ -144,14 +144,14 @@ func (c *Crawler) enqueueUrls(links []*url.URL) {
 	}
 
 	conn := redis.GetConn()
-	defer conn.Close()
+	defer redis.ReturnConn(conn)
 
 	conn.Do("LPUSH", result...)
 
 	glog.Infof("Enqueued %d links", count)
 }
 
-func (c *Crawler) hasVisited(conn redigo.Conn, link *URLContext) bool {
+func (c *Crawler) hasVisited(conn redis.ResourceConn, link *URLContext) bool {
 	res, err := conn.Do("GET", fmt.Sprintf("%s:%s", visitedPrefix, link.normalizedURL.String()))
 
 	if err != nil {
@@ -162,7 +162,7 @@ func (c *Crawler) hasVisited(conn redigo.Conn, link *URLContext) bool {
 	return res != nil // || link.NormalizedURL().Host != "en.wikipedia.org"
 }
 
-func (c *Crawler) setVisited(conn redigo.Conn, link *URLContext) {
+func (c *Crawler) setVisited(conn redis.ResourceConn, link *URLContext) {
 	_, err := conn.Do("SETEX", fmt.Sprintf("%s:%s", visitedPrefix, link.normalizedURL.String()), visitedExpireTime, true)
 
 	if err != nil {

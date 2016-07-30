@@ -150,7 +150,7 @@ func (i Indexer) index(link *crawler.URLContext, words []string) {
 	}
 
 	c := redis.GetConn()
-	defer c.Close()
+	defer redis.ReturnConn(c)
 
 	c.Send("MULTI")
 
