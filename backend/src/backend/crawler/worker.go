@@ -10,10 +10,12 @@ import (
 	"backend/utils"
 	"bytes"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -22,12 +24,14 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	redigo "github.com/garyburd/redigo/redis"
 	"github.com/golang/glog"
+	"github.com/temoto/robotstxt"
 )
 
 const (
 	CrawlDelayPrefix  = "CrawlDelay"
 	DefaultCrawlDelay = 1
 	LastCrawlPrefix   = "LastCrawl"
+	RobotsTxtPrefix   = "RobotsTxt"
 )
 
 const (
@@ -51,6 +55,8 @@ type Worker struct {
 	enqueue chan<- []*url.URL
 
 	opts *Options
+
+	robots map[string]*robotstxt.Group
 }
 
 var (
@@ -59,11 +65,22 @@ var (
 
 var HttpClient = &http.Client{
 	CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		if isRobotsURL(req.URL) {
+			if len(via) >= 10 {
+				return errors.New("stopped after 10 redirects")
+			}
+			if len(via) > 0 {
+				req.Header.Set("User-Agent", via[0].Header.Get("User-Agent"))
+			}
+			return nil
+		}
 		return ErrEnqueueRedirect
 	},
 }
 
 func (w *Worker) run() {
+	w.robots = make(map[string]*robotstxt.Group)
+
 	defer func() {
 		glog.Infof("Worker#%s done.", w.id)
 	}()
@@ -104,7 +121,13 @@ func (w *Worker) run() {
 
 		ctx := deserializeURLContext(reply)
 
-		w.crawl(ctx)
+		if ctx.IsRobotsURL() {
+			w.requestRobotsTxt(ctx)
+		} else if w.isAllowedPerRobotsPolicies(ctx) {
+			w.requestURL(ctx)
+		} else {
+			glog.Infof("Disallowed by robots policy: %s", ctx.URL().String())
+		}
 
 		conn = redis.GetConn()
 
@@ -115,8 +138,94 @@ func (w *Worker) run() {
 	}
 }
 
+func (w *Worker) isAllowedPerRobotsPolicies(ctx *URLContext) bool {
+	group, ok := w.robots[ctx.NormalizedURL().Host]
+
+	if !ok {
+		w.loadRobotsTxtFromRedis(ctx)
+
+		group, ok = w.robots[ctx.NormalizedURL().Host]
+
+		if !ok {
+			// No robotstxt found. Always true
+			return true
+		}
+	}
+
+	return group.Test(ctx.NormalizedURL().Path)
+}
+
+func (w *Worker) requestRobotsTxt(ctx *URLContext) {
+	if res, ok := w.fetchURL(ctx); ok {
+		defer res.Body.Close()
+
+		buf, err := ioutil.ReadAll(res.Body)
+
+		if err != nil {
+			glog.Errorf("Error while reading robots.txt body: %s", err)
+			return
+		}
+
+		robot, err := robotstxt.FromStatusAndBytes(res.StatusCode, buf)
+
+		if err != nil {
+			glog.Errorf("Error while parsing robots file: %s", err)
+			return
+		}
+
+		w.loadRobotsTxt(ctx, robot)
+		w.saveRobotsTxt(ctx, res.StatusCode, buf)
+	} else {
+		// special case. the robots.txt request is failed because of any reason.
+		// treat it as allow all
+		w.saveRobotsTxt(ctx, 400, []byte{})
+	}
+}
+
+func (w *Worker) loadRobotsTxt(ctx *URLContext, robot *robotstxt.RobotsData) {
+	w.robots[ctx.NormalizedURL().Host] = robot.FindGroup(w.opts.UserAgent)
+}
+
+func (w *Worker) saveRobotsTxt(ctx *URLContext, statusCode int, data []byte) {
+	conn := redis.GetConn()
+	defer redis.ReturnConn(conn)
+
+	buf := new(bytes.Buffer)
+	buf.WriteString(fmt.Sprintf("%3d", statusCode))
+	buf.Write(data)
+
+	_, err := conn.Do("SET", redis.BuildKey(RobotsTxtPrefix, "%s", ctx.NormalizedURL().Host), buf.Bytes())
+
+	if err != nil {
+		glog.Errorf("%s", err)
+	}
+}
+
+func (w *Worker) loadRobotsTxtFromRedis(ctx *URLContext) {
+	conn := redis.GetConn()
+	defer redis.ReturnConn(conn)
+
+	res, err := redigo.Bytes(conn.Do("GET", redis.BuildKey(RobotsTxtPrefix, "%s", ctx.NormalizedURL().Host)))
+
+	if err != nil {
+		glog.Errorf("Error while getting robotstxt %s from redis: %s", ctx.NormalizedURL().Host, err)
+		return
+	}
+
+	statusCode, err := strconv.Atoi(string(res[:3]))
+
+	robot, err := robotstxt.FromStatusAndBytes(statusCode, res[3:])
+
+	if err != nil {
+		glog.Errorf("Error while parsing robotstxt %s from redis: %s", ctx.NormalizedURL().Host, err)
+		return
+	}
+
+	w.loadRobotsTxt(ctx, robot)
+}
+
 // crawl function calls fetch to fetch remote web page then process the data
-func (w *Worker) crawl(target *URLContext) {
+func (w *Worker) requestURL(target *URLContext) {
 	//glog.Infof("Crawling URL: %s", target.normalizedURL.String())
 	if res, ok := w.fetchURL(target); ok {
 		// handle fetched web page
@@ -170,13 +279,15 @@ func (w *Worker) checkCrawlFrequency(target *URLContext) int64 {
 
 	var key string
 
-	key = redis.BuildKey(CrawlDelayPrefix, "%s", target.NormalizedURL().Host)
-	delay, err := redigo.Int64(conn.Do("GET", key))
+	group, ok := w.robots[target.NormalizedURL().Host]
 
-	if err != nil && err != redigo.ErrNil {
-		glog.Errorf("Error while retrieving redis key %s, %s", key, err)
-		return 0
-	} else if err == redigo.ErrNil {
+	var delay int64
+
+	if ok {
+		delay = int64(group.CrawlDelay / time.Second)
+	}
+
+	if delay == 0 {
 		delay = 1
 	}
 
@@ -219,7 +330,7 @@ func (w *Worker) _fetch(target *URLContext) (*http.Response, error) {
 
 	defer w.markCrawlTime(target)
 
-	glog.Infof("[%s] Fetching: %s", w.id, target.normalizedURL.String())
+	glog.Infof("[%s] Fetching: %s", w.id, target.url.String())
 
 	req, err := http.NewRequest("GET", target.url.String(), nil)
 	if err != nil {

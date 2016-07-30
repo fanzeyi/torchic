@@ -95,9 +95,33 @@ func (c *Crawler) coordinatorRun() {
 
 		// dispatch
 		dest := hash(ctx.NormalizedURL().Host) % c.maxWorkers
-
 		destKey := redis.BuildKey(workerQueue, "%s", c.workers[dest].id)
+
+		robot, err := redigo.Bool(conn.Do("EXISTS", redis.BuildKey(RobotsTxtPrefix, "%s", ctx.NormalizedURL().Host)))
+
+		if err != nil {
+			glog.Errorf("Error while EXISTS robotsfile: %s", err)
+			robot = false
+		}
+
+		if !robot {
+			// need to fetch robot.txt first
+			robotCtx, err := ctx.getRobotsURLCtx()
+
+			_, err = conn.Do("LPUSH", destKey, robotCtx.serialize())
+
+			if err != nil {
+				glog.Errorf("Error while LPUSH robotsfile: %s", err)
+				continue
+			}
+		}
+
 		_, err = conn.Do("RPOPLPUSH", key, destKey)
+
+		if err != nil {
+			glog.Errorf("Error while RPOPLPUSH: %s", err)
+			continue
+		}
 
 		// set visited
 		c.setVisited(conn, ctx)
@@ -152,14 +176,14 @@ func (c *Crawler) enqueueUrls(links []*url.URL) {
 }
 
 func (c *Crawler) hasVisited(conn redis.ResourceConn, link *URLContext) bool {
-	res, err := conn.Do("GET", fmt.Sprintf("%s:%s", visitedPrefix, link.normalizedURL.String()))
+	exist, err := redigo.Bool(conn.Do("EXISTS", fmt.Sprintf("%s:%s", visitedPrefix, link.normalizedURL.String())))
 
 	if err != nil {
-		glog.Errorf("Error when redis GET: %s", err)
+		glog.Errorf("Error when redis EXISTS: %s", err)
 		return false
 	}
 
-	return res != nil // || link.NormalizedURL().Host != "en.wikipedia.org"
+	return exist // || link.NormalizedURL().Host != "en.wikipedia.org"
 }
 
 func (c *Crawler) setVisited(conn redis.ResourceConn, link *URLContext) {
