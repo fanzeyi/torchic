@@ -11,6 +11,8 @@ import (
 	"os/signal"
 	"runtime"
 	"syscall"
+
+	"github.com/golang/glog"
 )
 
 func main() {
@@ -42,4 +44,5 @@ func main() {
 	go indexer.Run()
 
 	<-exitSignal
+	glog.Flush()
 }
