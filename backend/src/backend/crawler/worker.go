@@ -81,12 +81,21 @@ func (w *Worker) run() {
 
 		if err != nil {
 			// no current working
-			glog.Infof("Reading from %s", key)
+			if err != redigo.ErrNil {
+				glog.Errorf("[%s] Error while getting work: %s", w.id, err)
+				conn.Close()
+
+				continue
+			}
 			reply, err = redigo.String(conn.Do("BRPOPLPUSH", key, workKey, 10))
 
 			if err != nil {
 				// no work received
-				glog.Errorf("Error: %s", err)
+				if err != redigo.ErrNil {
+					glog.Errorf("[%s] Error while getting work: %s", w.id, err)
+					conn.Close()
+					continue
+				}
 				conn.Close()
 				time.Sleep(1 * time.Second)
 				continue
@@ -138,7 +147,7 @@ func (w *Worker) fetchURL(target *URLContext) (res *http.Response, ok bool) {
 			if ue.Err == ErrEnqueueRedirect {
 				// CONCERN: ue.URL might be relative? Need confirm
 				w.enqueueSingleString(ue.URL, target)
-				glog.Warningf("Enqueuing redirection: %s", ue.URL)
+				glog.Warningf("[%s] Enqueuing redirection: %s", w.id, ue.URL)
 				slient = true
 			}
 		}
@@ -203,13 +212,13 @@ func (w *Worker) markCrawlTime(target *URLContext) {
 func (w *Worker) _fetch(target *URLContext) (*http.Response, error) {
 	if diff := w.checkCrawlFrequency(target); diff > 0 {
 		wait := time.After(time.Duration(diff) * time.Second)
-		glog.Infof("Wait for %d seconds", diff)
+		glog.Infof("[%s] Wait %s for %d seconds", w.id, target.NormalizedURL().Host, diff)
 		<-wait
 	}
 
 	defer w.markCrawlTime(target)
 
-	glog.Infof("#%s Fetching URL: %s", w.id, target.normalizedURL.String())
+	glog.Infof("[%s] Fetching: %s", w.id, target.normalizedURL.String())
 
 	req, err := http.NewRequest("GET", target.url.String(), nil)
 	if err != nil {
@@ -228,7 +237,7 @@ func (w *Worker) visitURL(target *URLContext, res *http.Response) {
 	var doc *goquery.Document
 
 	if body, err := ioutil.ReadAll(res.Body); err != nil {
-		glog.Errorf("Error reading body %s: %s", target.url, err)
+		glog.Errorf("[%s] Error reading body %s: %s", w.id, target.url, err)
 		return
 	} else if node, err := html.Parse(bytes.NewBuffer(body)); err != nil {
 		glog.Errorf("Error parsing %s: %s", target.url, err)
@@ -246,7 +255,7 @@ func (w *Worker) visitURL(target *URLContext, res *http.Response) {
 			return
 		}
 		links := w.processLinks(target, doc)
-		glog.Infof("Sending to enqueue, length=%d", len(links))
+		glog.Infof("[%s] Sending to enqueue, length=%d", w.id, len(links))
 		w.enqueue <- links
 	}
 
@@ -270,12 +279,20 @@ func (w *Worker) processLinks(target *URLContext, doc *goquery.Document) (result
 			return ""
 		}
 
+		if hreflang, _ := s.Attr("hreflang"); hreflang != "" && !strings.HasPrefix(hreflang, "en") {
+			// ignore non-English links
+			//glog.Infof("ignored link %s.", val)
+			return ""
+		}
+
 		if baseUrl != "" {
 			val = handleBaseTag(target, baseUrl, val)
 		}
 
 		return val
 	})
+
+	result = append(result, target.URL())
 
 	for _, s := range urls {
 		if len(s) > 0 && !strings.HasPrefix(s, "#") {
