@@ -41,9 +41,6 @@ type Options struct {
 type Worker struct {
 	id string
 
-	// incomming channel is where the jobs coming in
-	incoming utils.PopChannel
-
 	outgoing *utils.PopChannel
 
 	// stop channel is where the worker receives its stop signal
@@ -327,10 +324,6 @@ func (w *Worker) enqueueSingleString(raw string, source *URLContext) {
 
 func (w *Worker) enqueueSingle(u, src *url.URL) {
 	w.enqueue <- []*url.URL{src, u}
-}
-
-func (w *Worker) push(link *URLContext) {
-	w.incoming.Stack(link)
 }
 
 func (w *Worker) sendResponse(link *URLContext, document *goquery.Document) {

@@ -179,7 +179,6 @@ func hash(raw string) uint32 {
 func (c *Crawler) launchWorker(id uint32) *Worker {
 	w := &Worker{
 		id:       fmt.Sprintf("%d:%d", c.id, id),
-		incoming: utils.NewPopChannel(),
 		outgoing: c.outgoing,
 		enqueue:  c.enqueue,
 		opts: &Options{
