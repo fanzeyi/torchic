@@ -21,10 +21,10 @@ public class JedisMaker {
 	 * @return
 	 * @throws IOException
 	 */
-	public static Jedis make() throws IOException {
+	public static Jedis make() {
 
 
-		// assemble the file name
+		/** assemble the file name
 		String slash = File.separator;
 		String filename = "resources" + slash + "redis_url.txt";
 		URL fileURL = JedisMaker.class.getClassLoader().getResource(filename);
@@ -38,13 +38,19 @@ public class JedisMaker {
 			printInstructions();
 			return null;
 		}
-
-		while (true) {
-			String line = br.readLine();
-			if (line == null) break;
-			sb.append(line);
+		try {
+			while (true) {
+				String line = br.readLine();
+				if (line == null) break;
+				sb.append(line);
+			}
+			br.close();
+		} catch (IOException e)
+		{
+			System.out.println("IOException");
+			System.exit(0);
 		}
-		br.close();
+
 
 		URI uri;
 		try {
@@ -65,16 +71,16 @@ public class JedisMaker {
 		//String host = "dory.redistogo.com";
 		//int port = 10534;
 		//String auth = System.getenv("REDISTOGO_AUTH");
-
-		Jedis jedis = new Jedis(127.0.0.1, 6379);
+		*/
+		Jedis jedis = new Jedis("localhost", 6379);
 
 		try {
-			jedis.auth(auth);
+			jedis.auth("");
 		} catch (Exception e) {
-			System.out.println("Trying to connect to " + host);
-			System.out.println("on port " + port);
-			System.out.println("with authcode " + auth);
-			System.out.println("Got exception " + e);
+			//System.out.println("Trying to connect to " + host);
+			//System.out.println("on port " + port);
+			//System.out.println("with authcode " + auth);
+			//System.out.println("Got exception " + e);
 			printInstructions();
 			return null;
 		}
@@ -101,7 +107,7 @@ public class JedisMaker {
 	 * @param args
 	 * @throws IOException
 	 */
-	public static void main(String[] args) throws IOException {
+	public static void main(String[] args) {
 
 		Jedis jedis = make();
 

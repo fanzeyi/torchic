@@ -26,13 +26,14 @@ import redis.clients.jedis.Jedis;
 */
 public class WebSearch {
 	// map from document that contains term t to term frequency
-	private Map<String, Integer> map;
+	private MapTF map;
 	// map from document containing term t to BM25 score
 	private MapBM<String, Double> mapBM;
 	//number of times term t appears in all documents of collection containing term t
 	private Integer n_i;
+	private String term;
 	private static Integer TOTALDOCUMENTS;//can i take this out?
-	protected static JedisIndex index = new JedisIndex(JedisMaker.make());
+	protected static JedisIndex index = new JedisIndex(new Jedis("localhost", 6379));
 	/**
 	* Constructor.
 	*
@@ -40,15 +41,19 @@ public class WebSearch {
 	*/
 
 	public WebSearch(Map<String, Integer> map) {
-		this.n_i = 1;
-		this.map = map;
-		this.mapBM = new MapBM<String, Double>(map);
+		//this.map = map;
+		this.map = new MapTF(map, term);
+		this.n_i = this.map.getTotalFrequency();
+		this.mapBM = new MapBM<String, Double>(map, index, term, 1);
 	}
-	public WebSearch(Map<String, Integer> map, Integer n_i, Integer qf_i)
+	public WebSearch(Map<String, Integer> map, String term, Integer termWeight)
 	{
-		this.n_i = n_i;
-		this.map = map;
-		this.mapBM = bm25(map, qf_i);
+		//this.map = map;
+		this.map = new MapTF(map, term);
+		this.n_i = this.map.getTotalFrequency();
+		this.term = term;
+		//this.mapBM = bm25(map, qf_i);
+		this.mapBM = new MapBM<String, Double>(map, index, term, termWeight);
 	}
 	public static MapBM<String, Double> multiSearch(WebSearch t1, WebSearch t2)
 	{
@@ -82,16 +87,7 @@ public class WebSearch {
 		return refined;
 	}
 
-	/**
-	* Looks up the relevance of a given URL.
-	*
-	* @param url
-	* @return
-	*/
-	public Integer getRelevance(String url) {
-		Integer relevance = map.get(url);
-		return relevance==null ? 0: relevance;
-	}
+
 	/**
 	* Prints the contents in order of term frequency.
 	*
@@ -104,35 +100,7 @@ public class WebSearch {
 		}
 	}
 	*/
-	/**
-	* Sort the results by relevance.
-	*
-	* @return List of entries with URL and relevance.
-	*/
-	public List<Entry<String, Integer>> sort() {
-		Set entrySet = this.map.entrySet();
-		List list = new LinkedList<Entry<String, Integer>>(entrySet);
-		Comparator<Entry<String, Integer>> c = new Comparator<Entry<String, Integer>>()
-		{
-			@Override
-			public int compare(Entry<String, Integer> e1, Entry<String, Integer> e2)
-			{
-				Integer val_e1 = e1.getValue();
-				Integer val_e2 = e2.getValue();
-				if(val_e1 == val_e2)
-				{
-					return 0;
-				}
-				else if(val_e1 > val_e2)
-				{
-					return 1;
-				}
-				return -1;
-			}
-		};
-		Collections.sort(list, c);
-		return list;
-	}
+
 
 	/**
 	* Performs a search and makes a WebSearch object.
@@ -140,7 +108,7 @@ public class WebSearch {
 	* @param term
 	* @param index
 	* @return
-	*/
+
 	public static WebSearch singleSearch(String term, JedisIndex index, Integer qf_i) {
 		Map<String, Integer> map = index.getCounts(term);//mapping from document to term frequency
 		Integer n_i = new Integer(index.returnTotal(map));//should be: number of times term i appears in all documents
@@ -148,16 +116,19 @@ public class WebSearch {
 		TOTALDOCUMENTS = index.numberOfTermCounters();
 		return new WebSearch(map, n_i, qf_i);
 	}
-
+	*/
 	public static WebSearch singleSearch(Map.Entry<String, Integer> query) {
 		String term = query.getKey();
 		Integer termWeight = query.getValue();
 
 		Map<String, Integer> map = index.getCounts(term);//mapping from document to term frequency
-		Integer totalTermFrequency = new Integer(index.returnTotal(map));//should be: number of times term i appears in all documents
+		//Integer totalTermFrequency = new Integer(index.returnTotal(map));//should be: number of times term i appears in all documents
+		//Integer totalTermFrequency = new Integer(map.totalFrequency(term));
 		//System.out.println(term+": n_i: "+n_i);
-		TOTALDOCUMENTS = index.numberOfTermCounters();//is this correct?
-		return new WebSearch(map, totalTermFrequency, termWeight);
+		TOTALDOCUMENTS = index.getTotalDocuments();//is this correct?
+		//return new WebSearch(map, term, totalTermFrequency, termWeight);
+		return new WebSearch(map, term, termWeight);
+
 	}
 	/**
 	* Returns a list of WebSearch objects from user query - each WebSearch objects
@@ -174,14 +145,6 @@ public class WebSearch {
 		return list;
 	}
 
-	public static void showMap(MapBM<String, Double> map)
-	{
-		List<Entry<String, Integer>> entries = map.sort();
-		for (Entry<String, Integer> entry: entries) {
-			System.out.println("SHOWMAP");
-			System.out.println(entry);
-		}
-	}
 	public static void main(String[] args) throws IOException {
 		Scanner in = new Scanner(System.in);
 		System.out.println("Please enter search terms");

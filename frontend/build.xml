@@ -342,11 +342,11 @@
     </target>
     <target name="MapBM">
       <java classname="com.flatironschool.javacs.MapBM" failonerror="true" fork="yes">
-        
+
       </java>
     </target>
-    <target name="WikiSearch">
-        <java classname="com.flatironschool.javacs.WikiSearch" failonerror="true" fork="yes">
+    <target name="WebSearch">
+        <java classname="com.flatironschool.javacs.WebSearch" failonerror="true" fork="yes">
             <env key="REDISTOGO_AUTH" value="2979811b19fe8895c14425ed5e694107"/>
             <classpath refid="JavaCS.classpath"/>
         </java>

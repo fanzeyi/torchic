@@ -18,18 +18,18 @@ public interface MapRelevance<K,V>
   * Takes in a mapping from documents to term frequency and returns a mapping
   * from documents to BM25 relevance score
   */
-  Map<K,V> convert(Map<K,T> map, Integer i);
+  Map<String,Double> convert(Map<String,Integer> map);
   /**
   * Calculates the relevance score for each document within a collection
   */
-  V getSingleRelevance(K key, Integer i);
+  Double getSingleRelevance(String key);
   /**
   * Sorts the map in ascending order
   */
-  List<Entry<K, V>> sort();
+  List<Entry<String, Double>> sort();
   /**
   * Prints the entries of the given map
   */
-  void print(Map<K,V> map);
+  void print();
 
 }
