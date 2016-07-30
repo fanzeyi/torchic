@@ -20,7 +20,7 @@ const (
 )
 
 const (
-	visitedPrefix = "Visited"
+	visitedPrefix = "visited"
 	// (unit: second) 7200 seconds = 2 hour
 	visitedExpireTime = 7200
 )
@@ -76,7 +76,7 @@ func (c *Crawler) coordinatorRun() {
 	defer conn.Close()
 
 	for {
-		key := redis.BuildKey(crawlQueue, "%s", c.id)
+		key := redis.BuildKey(crawlQueue, "%d", c.id)
 		reply, err := redigo.String(conn.Do("BRPOPLPUSH", crawlQueue, key, 10))
 
 		if reply == "" || err != nil {

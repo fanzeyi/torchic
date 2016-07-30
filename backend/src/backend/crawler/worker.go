@@ -156,7 +156,9 @@ func (w *Worker) fetchURL(target *URLContext) (res *http.Response, ok bool) {
 			glog.Errorf("#%s Error while fetching %s: %s", w.id, target.normalizedURL, err)
 		}
 
-		return nil, false
+		ok = false
+
+		return
 	}
 
 	ok = true
@@ -200,6 +202,7 @@ func (w *Worker) checkCrawlFrequency(target *URLContext) int64 {
 
 func (w *Worker) markCrawlTime(target *URLContext) {
 	conn := redis.GetConn()
+	defer conn.Close()
 
 	key := redis.BuildKey(LastCrawlPrefix, "%s", target.NormalizedURL().Host)
 	_, err := conn.Do("SET", key, time.Now().Unix())

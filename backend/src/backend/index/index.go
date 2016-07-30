@@ -153,14 +153,20 @@ func (i Indexer) index(link *crawler.URLContext, words []string) {
 	defer c.Close()
 
 	c.Send("MULTI")
+
+	sadd := make([]interface{}, 0)
+	sadd = append(sadd, redis.BuildKey(UrlPrefix, "%s", link.URL().String()))
+
 	for word, num := range count {
-		//glog.Infof("key: %s, type: %s", redis.BuildKey(TermPrefix, "%s", word), reflect.TypeOf(word))
 		c.Send("ZADD", redis.BuildKey(TermPrefix, "%s", word), float32(num)/float32(total), link.URL().String())
-		c.Send("SADD", redis.BuildKey(UrlPrefix, "%s", link.URL().String()), word)
+		sadd = append(sadd, word)
 	}
+
+	c.Send("SADD", sadd...)
+
 	_, err := c.Do("EXEC")
 
 	if err != nil {
-		glog.Errorf("%s", err)
+		glog.Errorf("%s %d", err, len(count))
 	}
 }

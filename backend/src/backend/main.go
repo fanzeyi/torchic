@@ -15,6 +15,8 @@ import (
 	"github.com/golang/glog"
 )
 
+var id = flag.Uint("id", 1, "Running instance ID. Must be unique")
+
 func main() {
 
 	sigChan := make(chan os.Signal)
@@ -36,7 +38,7 @@ func main() {
 
 	crawlRespChan := utils.NewPopChannel()
 
-	worker := crawler.NewCrawler(1, 10, &crawlRespChan)
+	worker := crawler.NewCrawler(uint32(*id), 10, &crawlRespChan)
 	worker.Run()
 	worker.Push("https://en.wikipedia.org/")
 
