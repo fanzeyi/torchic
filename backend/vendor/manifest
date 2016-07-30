@@ -64,6 +64,41 @@
 			"branch": "master"
 		},
 		{
+			"importpath": "github.com/youtube/vitess/go/acl",
+			"repository": "https://github.com/youtube/vitess",
+			"revision": "ccb2f11b2aae33bfc7250524d176764135a1c602",
+			"branch": "master",
+			"path": "/go/acl"
+		},
+		{
+			"importpath": "github.com/youtube/vitess/go/cache",
+			"repository": "https://github.com/youtube/vitess",
+			"revision": "ccb2f11b2aae33bfc7250524d176764135a1c602",
+			"branch": "master",
+			"path": "/go/cache"
+		},
+		{
+			"importpath": "github.com/youtube/vitess/go/pools",
+			"repository": "https://github.com/youtube/vitess",
+			"revision": "ccb2f11b2aae33bfc7250524d176764135a1c602",
+			"branch": "master",
+			"path": "/go/pools"
+		},
+		{
+			"importpath": "github.com/youtube/vitess/go/sync2",
+			"repository": "https://github.com/youtube/vitess",
+			"revision": "ccb2f11b2aae33bfc7250524d176764135a1c602",
+			"branch": "master",
+			"path": "/go/sync2"
+		},
+		{
+			"importpath": "golang.org/x/net/context",
+			"repository": "https://go.googlesource.com/net",
+			"revision": "6a513affb38dc9788b449d59ffed099b8de18fa0",
+			"branch": "master",
+			"path": "/context"
+		},
+		{
 			"importpath": "golang.org/x/net/html",
 			"repository": "https://go.googlesource.com/net",
 			"revision": "4d38db76854b199960801a1734443fd02870d7e1",
