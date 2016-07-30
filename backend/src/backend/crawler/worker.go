@@ -76,6 +76,7 @@ var HttpClient = &http.Client{
 		}
 		return ErrEnqueueRedirect
 	},
+	Timeout: 10 * time.Second,
 }
 
 func (w *Worker) run() {
@@ -348,6 +349,13 @@ func (w *Worker) _fetch(target *URLContext) (*http.Response, error) {
 func (w *Worker) visitURL(target *URLContext, res *http.Response) {
 	var doc *goquery.Document
 
+	contentType := res.Header.Get("Content-Type")
+
+	// skip non text pages
+	if !strings.HasPrefix(contentType, "text") {
+		return
+	}
+
 	if body, err := ioutil.ReadAll(res.Body); err != nil {
 		glog.Errorf("[%s] Error reading body %s: %s", w.id, target.url, err)
 		return
@@ -410,7 +418,10 @@ func (w *Worker) processLinks(target *URLContext, doc *goquery.Document) (result
 		if len(s) > 0 && !strings.HasPrefix(s, "#") {
 			if parsed, err := url.Parse(s); err == nil {
 				parsed = doc.Url.ResolveReference(parsed)
-				result = append(result, parsed)
+
+				if parsed.Scheme == "http" || parsed.Scheme == "https" {
+					result = append(result, parsed)
+				}
 			} else {
 				glog.Warningf("ignored on unparsable policy %s: %s", s, err)
 			}
