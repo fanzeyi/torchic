@@ -3,6 +3,7 @@ package main
 import (
 	"backend/crawler"
 	"backend/index"
+	"backend/mysql"
 	"backend/redis"
 	"backend/utils"
 	"flag"
@@ -25,7 +26,7 @@ var prof = flag.Bool("prof", false, "Enable profiling web server")
 //var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
 
 func main() {
-	if prof {
+	if *prof {
 		go func() {
 			glog.Infof("%s", http.ListenAndServe("localhost:6060", nil))
 		}()
@@ -48,6 +49,7 @@ func main() {
 	flag.Parse()
 
 	redis.Init(REDIS_HOST, REDIS_PORT, REDIS_PASSWORD)
+	mysql.Init(MYSQL_ADDRESS, MYSQL_USERNAME, MYSQL_PASSWORD, MYSQL_DBNAME)
 
 	crawlRespChan := utils.NewPopChannel()
 

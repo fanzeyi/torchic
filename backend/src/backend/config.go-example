@@ -1,0 +1,14 @@
+package main
+
+const (
+	REDIS_HOST     = "127.0.0.1"
+	REDIS_PORT     = "6379"
+	REDIS_PASSWORD = ""
+)
+
+const (
+	MYSQL_ADDRESS  = "127.0.0.1:3306"
+	MYSQL_USERNAME = "codeu"
+	MYSQL_PASSWORD = ""
+	MYSQL_DBNAME   = "codeu"
+)
