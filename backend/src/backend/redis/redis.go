@@ -30,7 +30,7 @@ func Init(host, port, password string) {
 	pool = pools.NewResourcePool(func() (pools.Resource, error) {
 		c, err := redis.Dial("tcp", fmt.Sprintf("%s:%s", host, port))
 		return ResourceConn{c}, err
-	}, 20, 40, 3*time.Second)
+	}, 15, 25, 10*time.Second)
 }
 
 func GetConn() ResourceConn {

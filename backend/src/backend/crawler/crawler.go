@@ -20,7 +20,8 @@ const (
 )
 
 const (
-	visitedPrefix = "visited"
+	visitedPrefix      = "visited"
+	visitedPrefixSplit = len(visitedPrefix) + 3
 	// (unit: second) 7200 seconds = 2 hour
 	visitedExpireTime = 7200
 )
@@ -176,18 +177,26 @@ func (c *Crawler) enqueueUrls(links []*url.URL) {
 }
 
 func (c *Crawler) hasVisited(conn redis.ResourceConn, link *URLContext) bool {
-	exist, err := redigo.Bool(conn.Do("EXISTS", fmt.Sprintf("%s:%s", visitedPrefix, link.normalizedURL.String())))
+	key := redis.BuildKey(visitedPrefix, "%s", link.NormalizedHash())
 
-	if err != nil {
+	lastTs, err := redigo.Int64(conn.Do("HGET", key[:visitedPrefixSplit], key[visitedPrefixSplit:]))
+
+	if err != nil && err != redigo.ErrNil {
 		glog.Errorf("Error when redis EXISTS: %s", err)
+		return false
+	} else if err == redigo.ErrNil {
 		return false
 	}
 
-	return exist // || link.NormalizedURL().Host != "en.wikipedia.org"
+	now := time.Now().Unix()
+
+	return now < lastTs+visitedExpireTime // || link.NormalizedURL().Host != "en.wikipedia.org"
 }
 
 func (c *Crawler) setVisited(conn redis.ResourceConn, link *URLContext) {
-	_, err := conn.Do("SETEX", fmt.Sprintf("%s:%s", visitedPrefix, link.normalizedURL.String()), visitedExpireTime, true)
+	key := redis.BuildKey(visitedPrefix, "%s", link.NormalizedHash())
+
+	_, err := conn.Do("HSET", key[:visitedPrefixSplit], key[visitedPrefixSplit:], time.Now().Unix())
 
 	if err != nil {
 		glog.Errorf("Error when redis SETNX: %s", err)
