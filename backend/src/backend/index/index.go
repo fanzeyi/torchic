@@ -2,6 +2,7 @@ package index
 
 import (
 	"backend/crawler"
+	"backend/mysql"
 	"backend/redis"
 	"backend/utils"
 	"bytes"
@@ -107,7 +108,8 @@ func validateWord(word string) bool {
 
 func (i Indexer) process(job *crawler.CrawlResponse) {
 	doc := Document(*job.Document)
-	words := i.segment(doc.ExtractText())
+	text := doc.ExtractText()
+	words := i.segment(text)
 	processed := make([]string, 0)
 
 	for _, word := range words {
@@ -130,7 +132,11 @@ func (i Indexer) process(job *crawler.CrawlResponse) {
 	//glog.Infof("words: %v", doc.ExtractText())
 	//glog.Infof("%v", processed)
 
-	i.index(job.Link, processed)
+	if len(processed) > 0 {
+		if id, ok := i.save(job.Link, job.Document, text); ok {
+			i.index(id, processed)
+		}
+	}
 }
 
 func (i Indexer) segment(text string) []string {
@@ -140,7 +146,35 @@ func (i Indexer) segment(text string) []string {
 	})
 }
 
-func (i Indexer) index(link *crawler.URLContext, words []string) {
+func (i Indexer) save(link *crawler.URLContext, doc *goquery.Document, text string) (id int64, ok bool) {
+	db := mysql.GetConn()
+
+	html, err := goquery.OuterHtml(doc.AndSelf())
+
+	if err != nil {
+		glog.Errorf("Error while getting html from document: %s", err)
+	}
+
+	res, err := db.Exec("INSERT INTO urls (hash, url, html, text) VALUES(?, ?, ?, ?)", link.Hash(), link.URL().String(), html, text)
+
+	if err != nil {
+		glog.Errorf("Error while inserting into MySQL: %s", err)
+		return
+	}
+
+	id, err = res.LastInsertId()
+
+	if err != nil {
+		glog.Errorf("Error while getting last insert ID: %s", err)
+		return
+	}
+
+	ok = true
+
+	return
+}
+
+func (i Indexer) index(id int64, words []string) {
 	var count map[string]uint
 
 	count = make(map[string]uint)
@@ -155,10 +189,10 @@ func (i Indexer) index(link *crawler.URLContext, words []string) {
 	c.Send("MULTI")
 
 	sadd := make([]interface{}, 0)
-	sadd = append(sadd, redis.BuildKey(UrlPrefix, "%s", link.URL().String()))
+	sadd = append(sadd, redis.BuildKey(UrlPrefix, "%d", id))
 
 	for word, num := range count {
-		c.Send("ZADD", redis.BuildKey(TermPrefix, "%s", word), num, link.URL().String())
+		c.Send("ZADD", redis.BuildKey(TermPrefix, "%s", word), num, id)
 		sadd = append(sadd, word)
 	}
 
@@ -169,7 +203,7 @@ func (i Indexer) index(link *crawler.URLContext, words []string) {
 		c.Send("SADD", sadd...)
 	}
 
-	c.Send("SET", redis.BuildKey(CountPrefix, "%s", link.URL().String()), len(count))
+	c.Send("SET", redis.BuildKey(CountPrefix, "%s", id), len(count))
 	c.Send("INCR", TotalDocumentsKey)
 
 	_, err := c.Do("EXEC")

@@ -1,7 +1,9 @@
 package crawler
 
 import (
+	"crypto/md5"
 	"encoding/base64"
+	"encoding/hex"
 	"net/url"
 	"strings"
 
@@ -14,7 +16,7 @@ const (
 )
 
 const (
-	URLNormalizationFlags = purell.FlagsUsuallySafeGreedy | purell.FlagSortQuery | purell.FlagRemoveFragment | purell.FlagRemoveDirectoryIndex
+	URLNormalizationFlags = purell.FlagsUsuallySafeGreedy | purell.FlagSortQuery | purell.FlagRemoveFragment | purell.FlagRemoveDirectoryIndex | purell.FlagForceHTTP | purell.FlagRemoveDuplicateSlashes | purell.FlagRemoveUnnecessaryHostDots | purell.FlagRemoveEmptyPortSeparator
 )
 
 type URLContext struct {
@@ -67,6 +69,20 @@ func (uc *URLContext) getRobotsURLCtx() (*URLContext, error) {
 
 func (uc *URLContext) serialize() string {
 	return serializeUrl(uc.url, uc.sourceURL)
+}
+
+func (uc *URLContext) hash(u *url.URL) string {
+	hasher := md5.New()
+	hasher.Write([]byte(u.String()))
+	return hex.EncodeToString(hasher.Sum(nil))
+}
+
+func (uc *URLContext) Hash() string {
+	return uc.hash(uc.url)
+}
+
+func (uc *URLContext) NormalizedHash() string {
+	return uc.hash(uc.normalizedURL)
 }
 
 func deserializeURLContext(data string) *URLContext {
