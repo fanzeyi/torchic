@@ -45,6 +45,7 @@ public class WebSearch {
 		this.term = term;
 		this.mapBM = new MapBM<String, Double>(map, index, term, termWeight);
 	}
+	
 	public static ResultMap multiSearch(WebSearch t1, WebSearch t2)
 	{
 		Map<String, Double> refined = new HashMap<String, Double>();
@@ -123,21 +124,7 @@ public class WebSearch {
 		one.mapBM.entryView();
 		ResultMap multi = multiSearch(one, searchResults.get(1));
 		multi.print();
-		/*Set<String> keySet = query.keySet();
-		//System.out.println(arrString(arr));
-		//JedisIndex.loadIndex(index);
-		//processRelevance(keySet);
-		// search for the first term
-
-		List<WebSearch> list = new LinkedList<WebSearch>();
-		for(String t:keySet)
-		{
-			String term = t;
-			Integer qf_i = query.get(t);
-			WebSearch search = singleSearch(term, index, qf_i);
-			search.print();
-			list.add(search);
-		}*/
+		
 		System.out.println("end");
 	}
 }

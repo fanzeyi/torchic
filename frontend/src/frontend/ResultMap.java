@@ -1,7 +1,9 @@
 package frontend;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +43,15 @@ public class ResultMap {
 		};
 		Collections.sort(list, c);
 		return list;
+	}
+	public ResultMap combine(ResultMap one, ResultMap two)
+	{
+		List<String> combinedQueries = Arrays.asList(one.query);
+		combinedQueries.addAll(Arrays.asList(two.query));
+		String[] queries = combinedQueries.toArray(new String[combinedQueries.size()]);
+		HashMap<String, Double> newMap = new HashMap<String, Double>(one.map);
+		newMap.putAll(two.map);
+		return new ResultMap(newMap, queries);
 	}
 
 }
