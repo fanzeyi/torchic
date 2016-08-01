@@ -21,8 +21,8 @@ public class ResultMap {
 	}
 	public void print()
 	{
-		System.out.println(map.size());
 		List<Entry<String, Double>> entries = sort();
+		entries = getNResults(entries, 10);
 		for (Entry<String, Double> entry: entries) {
 			System.out.println(entry);
 		}
@@ -44,14 +44,10 @@ public class ResultMap {
 		Collections.sort(list, c);
 		return list;
 	}
-	public ResultMap combine(ResultMap one, ResultMap two)
+	public List<Entry<String, Double>> getNResults(List<Entry<String, Double>> results, int n)
 	{
-		List<String> combinedQueries = Arrays.asList(one.query);
-		combinedQueries.addAll(Arrays.asList(two.query));
-		String[] queries = combinedQueries.toArray(new String[combinedQueries.size()]);
-		HashMap<String, Double> newMap = new HashMap<String, Double>(one.map);
-		newMap.putAll(two.map);
-		return new ResultMap(newMap, queries);
+		int count = results.size() > n ? n : results.size();
+		return results.subList(0, count);
 	}
 
 }
