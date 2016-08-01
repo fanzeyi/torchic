@@ -30,6 +30,10 @@ public class MapBM<K,V> extends HashMap<K,V> implements MapRelevance<K,V>
 		this.termWeight = termWeight;
 		this.map = convert(old);
 	}
+	public Map<String, Double> getMap()
+	{
+		return this.map;
+	}
 	public Double getRel(String s)
 	{
 		return this.map.get(s) == null ? 0 : this.map.get(s);

@@ -33,11 +33,7 @@ public class WebSearch {
 	*
 	* @param map
 	*/
-	public WebSearch(Map<String, Integer> map) {
-		this.map = new MapTF(map, term);
-		this.n_i = this.map.getTotalFrequency();
-		this.mapBM = new MapBM<String, Double>(map, index, term, 1);
-	}
+
 	public WebSearch(Map<String, Integer> map, String term, Integer termWeight)
 	{
 		this.map = new MapTF(map, term);
@@ -45,36 +41,62 @@ public class WebSearch {
 		this.term = term;
 		this.mapBM = new MapBM<String, Double>(map, index, term, termWeight);
 	}
-	
-	public static ResultMap multiSearch(WebSearch t1, WebSearch t2)
+	public static ResultMap multiSearch(List<WebSearch> list)
 	{
-		Map<String, Double> refined = new HashMap<String, Double>();
-		MapBM<String, Double> m1 = t1.mapBM;
-		MapBM<String, Double> m2 = t2.mapBM;
+		List<Map<String, Double>> bmList = new LinkedList<Map<String, Double>>();
+		List<String> terms = new LinkedList<String>();
+		for(WebSearch search: list)
+		{
+			terms.add(search.term);
+			bmList.add(search.mapBM.getMap());
+		}
+		Map<String, Double> resMap = one(bmList);
+		String[] queries = terms.toArray(new String[0]);
+		return new ResultMap(resMap, queries);
+	}
+	private static Map<String, Double> one(List<Map<String, Double>> maps)
+	{
+		if(maps.size() == 0)
+		{
+			return new HashMap<String, Double>();
+		}
+		else if(maps.size()==1)
+		{
+			return maps.get(0);
+		}
+		else
+		{
+			Map<String, Double> l1 = maps.get(0);
+			Map<String, Double> l2 = maps.get(1);
+			List<Map<String, Double>> l3 = maps.subList(2, maps.size());
+			return two(two(l1,l2),one(l3));
+		}
+	}
+	private static Map<String, Double> two(Map<String, Double> m1, Map<String, Double> m2)
+	{
+		Map<String, Double> combined = new HashMap<String, Double>();
 		Set<String> m1_keys = (Set<String>)m1.keySet();
 		Set<String> m2_keys = (Set<String>)m2.keySet();
 		for(String s:m1_keys)
 		{
 			if(m2.containsKey(s))
 			{
-				Double rel = m1.getRel(s)+m2.getRel(s);
-				refined.put(s,rel);
+				Double rel = m1.get(s)+m2.get(s);
+				combined.put(s,rel);
 				m2_keys.remove(s);
 			}
 			else
 			{
-				Double rel = m1.getRel(s);
-				refined.put(s, rel);
+				Double rel = m1.get(s);
+				combined.put(s, rel);
 			}
 		}
 		for(String s:m2_keys)
 		{
-			Double rel = m2.getRel(s);
-			refined.put(s, rel);
+			Double rel = m2.get(s);
+			combined.put(s, rel);
 		}
-		System.out.println("SIZE:"+refined.size());
-		String[] query = {t1.term, t2.term};
-		return new ResultMap(refined, query);
+		return combined;
 	}
 
 	/**
@@ -119,10 +141,10 @@ public class WebSearch {
 		UserQuery query = new UserQuery(s);
 		List<WebSearch> searchResults = search(query);
 		System.out.println("Multi print");
-		WebSearch one = searchResults.get(0);
-		System.out.println("ONE");
-		one.mapBM.entryView();
-		ResultMap multi = multiSearch(one, searchResults.get(1));
+		//WebSearch one = searchResults.get(0);
+		//System.out.println("ONE");
+		//one.mapBM.entryView();
+		ResultMap multi = multiSearch(searchResults);
 		multi.print();
 		
 		System.out.println("end");
