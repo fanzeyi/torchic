@@ -1,4 +1,4 @@
-package frontend;
+package codeu.unnamed.frontend;
 
 import java.io.IOException;
 import java.util.Collections;
