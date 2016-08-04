@@ -32,7 +32,7 @@ public class MapBM<K,V> extends HashMap<K,V> implements MapRelevance<K,V>
 	}
 	public Double getRel(String s)
 	{
-		return this.map.get(s) == null ? 0 : this.map.get(s);
+		return this.map.get(s) == null ? 0.0 : this.map.get(s);
 	}
 	public int size()
 	{
