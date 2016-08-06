@@ -1,16 +1,11 @@
 {
+  let xhr;
   let auto_complete = new autoComplete({
     selector: '.search-input',
     minChars: 1,
-    source: function(term, suggest) {
-      term = term.toLowerCase();
-      let choices = ['hello', 'what', 'bug', 'when', 'where', 'which'];
-      let matches = [];
-      for (let word of choices) {
-        if (word.includes(term)) matches.push(word);
-      }
-
-      suggest(matches);
+    source: function(term, response) {
+        try { xhr.abort(); } catch(e){}
+        xhr = $.getJSON('/api/complete', { query: term }, function(data){ response(data); });
     }
   });
 
