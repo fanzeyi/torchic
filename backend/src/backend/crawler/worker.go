@@ -87,7 +87,7 @@ func (w *Worker) run() {
 	}()
 
 	for {
-		conn := redis.GetConn()
+		conn := redis.GetQueueConn()
 
 		key := redis.BuildKey(workerQueue, "%s", w.id)
 		workKey := redis.BuildKey(workerQueue, "%s:working", w.id)
@@ -98,7 +98,7 @@ func (w *Worker) run() {
 			// no current working
 			if err != redigo.ErrNil {
 				glog.Errorf("[%s] Error while getting work: %s", w.id, err)
-				redis.ReturnConn(conn)
+				redis.ReturnQueueConn(conn)
 
 				continue
 			}
@@ -108,17 +108,17 @@ func (w *Worker) run() {
 				// no work received
 				if err != redigo.ErrNil {
 					glog.Errorf("[%s] Error while getting work: %s", w.id, err)
-					redis.ReturnConn(conn)
+					redis.ReturnQueueConn(conn)
 					continue
 				}
-				redis.ReturnConn(conn)
+				redis.ReturnQueueConn(conn)
 				time.Sleep(1 * time.Second)
 				continue
 			}
 		}
 
 		// release conn to redis while crawling
-		redis.ReturnConn(conn)
+		redis.ReturnQueueConn(conn)
 
 		ctx := deserializeURLContext(reply)
 
@@ -130,12 +130,12 @@ func (w *Worker) run() {
 			glog.Infof("Disallowed by robots policy: %s", ctx.URL().String())
 		}
 
-		conn = redis.GetConn()
+		conn = redis.GetQueueConn()
 
 		// Work done.
 		conn.Do("RPOP", workKey)
 
-		redis.ReturnConn(conn)
+		redis.ReturnQueueConn(conn)
 	}
 }
 

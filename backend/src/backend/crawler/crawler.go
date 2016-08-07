@@ -73,8 +73,8 @@ func (c *Crawler) Run() {
 }
 
 func (c *Crawler) coordinatorRun() {
-	conn := redis.GetConn()
-	defer redis.ReturnConn(conn)
+	conn := redis.GetQueueConn()
+	defer redis.ReturnQueueConn(conn)
 
 	for {
 		key := redis.BuildKey(crawlQueue, "%d", c.id)
@@ -168,8 +168,8 @@ func (c *Crawler) enqueueUrls(links []*url.URL) {
 		count += 1
 	}
 
-	conn := redis.GetConn()
-	defer redis.ReturnConn(conn)
+	conn := redis.GetQueueConn()
+	defer redis.ReturnQueueConn(conn)
 
 	conn.Do("LPUSH", result...)
 
