@@ -48,7 +48,8 @@ func main() {
 
 	flag.Parse()
 
-	redis.Init(REDIS_HOST, REDIS_PORT, REDIS_PASSWORD)
+	redis.Init(INDEX_HOST, INDEX_PORT, INDEX_PASSWORD, INDEX_DB)
+	redis.InitQueue(QUEUE_HOST, QUEUE_PORT, QUEUE_PASSWORD, QUEUE_DB)
 	mysql.Init(MYSQL_ADDRESS, MYSQL_USERNAME, MYSQL_PASSWORD, MYSQL_DBNAME)
 
 	crawlRespChan := utils.NewPopChannel()
