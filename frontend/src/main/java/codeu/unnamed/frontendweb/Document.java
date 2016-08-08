@@ -19,6 +19,9 @@ public class Document {
     @NotNull
     private String url;
 
+    @NotNull
+    private String text;
+
     public Document() {
     }
 
@@ -53,5 +56,13 @@ public class Document {
 
     public void setUrl(String url) {
         this.url = url;
+    }
+
+    public String getText() {
+        return text;
+    }
+
+    public void setText(String text) {
+        this.text = text;
     }
 }

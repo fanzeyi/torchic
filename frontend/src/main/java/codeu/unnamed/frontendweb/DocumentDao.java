@@ -12,4 +12,6 @@ public interface DocumentDao extends CrudRepository<Document, Long> {
 
     public Document findByHash(String hash);
 
+    public Document findById(long id);
+
 }
