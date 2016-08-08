@@ -157,7 +157,7 @@ func (i Indexer) save(link *crawler.URLContext, doc *goquery.Document, words []s
 		glog.Errorf("Error while getting html from document: %s", err)
 	}
 
-	res, err := db.Exec("INSERT INTO urls (hash, url, html, text) VALUES(?, ?, ?, ?)", link.Hash(), link.URL().String(), html, strings.Join(words, " "))
+	res, err := db.Exec("INSERT INTO urls (hash, url, title, html, text) VALUES(?, ?, ?, ?, ?)", link.Hash(), link.URL().String(), doc.Find("title").Text(), html, strings.Join(words, " "))
 
 	if err != nil {
 		glog.Errorf("Error while inserting into MySQL: %s", err)
