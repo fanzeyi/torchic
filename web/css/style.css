@@ -130,6 +130,10 @@ html, body, input {
   text-decoration: underline;
 }
 
+.search-result strong {
+  font-weight: 700;
+}
+
 .search-result .meta {
   color: #666;
   font-weight: 400;
@@ -154,4 +158,36 @@ html, body, input {
   padding: 0 10px;
   margin: 10px 0;
   font-size: 14px;
+}
+
+.search-summary.hide {
+  display: none;
+}
+
+.not-found {
+  text-align: center;
+  padding: 50px;
+  display: none;
+}
+
+.not-found.show {
+  display: block;
+}
+
+.not-found .not-found-icon {
+  display: inline-block;
+  width: 100px;
+  height: 90px;
+  background-image: url('../img/404-icon.svg');
+  background-size: 100%;
+  background-repeat: no-repeat;
+  vertical-align: middle;
+}
+
+.not-found span {
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 20px;
+  color: #BBB;
+  font-size: 28px;
 }
