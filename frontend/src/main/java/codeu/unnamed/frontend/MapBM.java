@@ -1,5 +1,4 @@
-package codeu.unnamed.frontend;
-
+package main.java.codeu.unnamed.frontend;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Comparator;
@@ -29,6 +28,10 @@ public class MapBM<K,V> extends HashMap<K,V> implements MapRelevance<K,V>
 		this.term = term;
 		this.termWeight = termWeight;
 		this.map = convert(old);
+	}
+	public Map<String, Double> getMap()
+	{
+		return this.map;
 	}
 	public Double getRel(String s)
 	{
