@@ -1,5 +1,6 @@
 package codeu.unnamed.frontendweb;
 
+import codeu.unnamed.frontend.WebSearch;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -20,16 +21,23 @@ public class QueryController {
     @Autowired
     private DocumentDao documentDao;
 
+    private static WebSearch search = new WebSearch();
+
     @RequestMapping("/query")
-    public String query(@RequestParam(value="query", required = true) String query, @RequestParam(value="offset", required = false, defaultValue = "0") String offset) {
+    public List<ResultEntry> query(@RequestParam(value="query", required = true) String query, @RequestParam(value="offset", required = false, defaultValue = "0") String offset) {
         // TODO: process query with snowball here
         String[] terms = processQuery(query);
 
         // TODO: fill in here to get result from INDEX
 
-        // TODO: wrap up the result as response
+        List<String> result = search.processQueries(terms);
 
-        return String.join(", ", terms);
+        return result.stream().map((r) -> {
+            long id = Long.valueOf(r);
+            Document doc = this.documentDao.findById(id);
+
+            return new ResultEntry(doc.getTitle(), doc.getUrl(), null);
+        }).collect(Collectors.toList());
     }
 
     private String[] processQuery(String query) {

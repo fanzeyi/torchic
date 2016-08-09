@@ -11,12 +11,14 @@ import java.util.Map.Entry;
 import java.util.HashSet;
 import java.util.Scanner;
 
+import org.springframework.stereotype.Component;
 import redis.clients.jedis.Jedis;
 
 /**
 * Represents the results of a search query.
 *
 */
+@Component
 public class WebSearch {
 	// map from document that contains term t to term frequency
 	private MapTF map;
