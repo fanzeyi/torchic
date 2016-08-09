@@ -1,5 +1,4 @@
-package codeu.unnamed.frontend;
-
+package main.java.codeu.unnamed.frontend;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Comparator;
@@ -19,9 +18,9 @@ public class UserQuery
   /**
   * Constructor
   */
-  public UserQuery(String s)
+  public UserQuery(String[] s)
   {
-    this.query = processQueries(s);
+    this.query = processArrayQueries(s);
   }
   /**
   * Takes query string and creates mapping from query to query weight
@@ -39,6 +38,22 @@ public class UserQuery
 			else
 			{
 				map.put(k,1);
+			}
+		}
+		return map;
+	}
+	public Map<String, Integer> processArrayQueries(String[] queries)
+	{
+		Map<String, Integer> map = new HashMap<String, Integer>();
+		for(String s:queries)
+		{
+			if(map.containsKey(s))
+			{
+				map.put(s, map.get(s)+1);
+			}
+			else
+			{
+				map.put(s,1);
 			}
 		}
 		return map;
@@ -61,14 +76,5 @@ public class UserQuery
 	  }
 	  
   }
-  public static void main(String[] args)
-  {
-	  System.out.println("Enter query");
-	  Scanner in = new Scanner(System.in);
-	  String s = in.nextLine();
-	  UserQuery q = new UserQuery(s);
-	  q.print();
-	  System.out.println(q.getWeight("a"));
-  }
-}
+ }
 

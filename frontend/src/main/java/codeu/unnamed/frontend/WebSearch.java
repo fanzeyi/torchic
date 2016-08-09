@@ -1,5 +1,4 @@
-package codeu.unnamed.frontend;
-
+package main.java.codeu.unnamed.frontend;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Comparator;
@@ -41,6 +40,14 @@ public class WebSearch {
 		this.term = term;
 		this.mapBM = new MapBM<String, Double>(map, index, term, termWeight);
 	}
+	public WebSearch()
+	{
+		this.map = null;
+		this.n_i = null;
+		this.term = null;
+		this.mapBM = null;
+	}
+
 	public static ResultMap multiSearch(List<WebSearch> list)
 	{
 		List<Map<String, Double>> bmList = new LinkedList<Map<String, Double>>();
@@ -133,9 +140,17 @@ public class WebSearch {
 		}
 		return list;
 	}
-
+	
+   public List<String> processQueries(String[] q)
+   {
+	   UserQuery query = new UserQuery(q);
+	   List<WebSearch> searchResults = search(query);
+	   ResultMap multi = multiSearch(searchResults);
+	   return multi.returnResultSet();
+   }
+	
 	public static void main(String[] args) throws IOException {
-		Scanner in = new Scanner(System.in);
+		/*Scanner in = new Scanner(System.in);
 		System.out.println("Please enter search terms");
 		String s = in.nextLine();
 		UserQuery query = new UserQuery(s);
@@ -146,8 +161,11 @@ public class WebSearch {
 		//one.mapBM.entryView();
 		ResultMap multi = multiSearch(searchResults);
 		multi.print();
+		//List<Entry<String, Double>> results = multi.returnResultSet();
 		
-		System.out.println("end");
+		System.out.println("end");*/
+		String[] q = {"java", "project"};
+		System.out.println(new WebSearch().processQueries(q));
 	}
 }
 

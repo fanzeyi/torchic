@@ -24,7 +24,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-package ds.tree;
+package main.java.ds.tree;
 
 /**
  * The visitor interface that is used by {@link RadixTreeImpl} for perfroming

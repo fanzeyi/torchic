@@ -22,7 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-package ds.tree;
+package main.java.ds.tree;
 
 /**
  * excepion thrown if a duplicate key is inserted in a {@link RadixTree}

@@ -1,4 +1,4 @@
-package codeu.unnamed.frontendweb;
+package main.java.codeu.unnamed.frontendweb;
 
 import javax.persistence.*;
 import javax.validation.constraints.NotNull;
