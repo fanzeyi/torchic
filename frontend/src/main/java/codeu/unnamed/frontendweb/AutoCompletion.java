@@ -1,7 +1,7 @@
-package main.java.codeu.unnamed.frontendweb;
+package codeu.unnamed.frontendweb;
 
-import main.java.ds.tree.RadixTree;
-import main.java.ds.tree.RadixTreeImpl;
+import ds.tree.RadixTree;
+import ds.tree.RadixTreeImpl;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationListener;
 import org.springframework.stereotype.Component;

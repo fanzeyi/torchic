@@ -1,7 +1,7 @@
 /**
  * 
  */
-package main.java.codeu.unnamed.frontend;
+package codeu.unnamed.frontend;
 
 import java.util.Collections;
 import java.util.Comparator;

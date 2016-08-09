@@ -1,4 +1,4 @@
-package main.java.ds.tree;
+package ds.tree;
 
 
 /**

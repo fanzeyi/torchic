@@ -1,4 +1,4 @@
-package main.java.codeu.unnamed.frontendweb;
+package codeu.unnamed.frontendweb;
 
 import org.springframework.data.repository.CrudRepository;
 

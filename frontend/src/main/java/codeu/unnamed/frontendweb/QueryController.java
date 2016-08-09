@@ -1,4 +1,4 @@
-package main.java.codeu.unnamed.frontendweb;
+package codeu.unnamed.frontendweb;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.RequestMapping;
