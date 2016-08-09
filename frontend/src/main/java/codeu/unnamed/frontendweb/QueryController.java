@@ -46,24 +46,23 @@ public class QueryController {
         return stream.toArray(String[]::new);
     }
 
-    private static final WINDOW_LENGTH = 50;
+    private static final int WINDOW_LENGTH = 50;
 
     private String generateSummary(long id, String query) {
-        String[] querys = query.split(" ");
+        String[] queryies = query.split(" ");
 
         Document document = this.documentDao.findById(id);
 
         String[] words = document.getText().split(" ");
 
         int rank = 0;
-        int highest = 0;
 
         // need a circular array
         int[] mapping = new int[WINDOW_LENGTH];
 
         // first [length of window] words
         for( int i = 0; i < words.length && i < WINDOW_LENGTH; i++ ) {
-            if (arrayContains(querys, words[i])) {
+            if (arrayContains(queryies, words[i])) {
                 if (i == 0) {
                     mapping[i] = 1;
                 } else {
@@ -82,7 +81,7 @@ public class QueryController {
         for( int i = WINDOW_LENGTH; i < words.length; i++ ) {
             rank -= mapping[end % WINDOW_LENGTH];
 
-            if (arrayContains(querys, words[i])) {
+            if (arrayContains(queryies, words[i])) {
                 mapping[end] = mapping[(end-1) % WINDOW_LENGTH] + 1;
             } else {
                 mapping[end] = 0;
@@ -99,14 +98,14 @@ public class QueryController {
 
         String[] result = new String[WINDOW_LENGTH];
 
-        for ( int i = index; i < wrods.length && i < index + WINDOW_LENGTH; i++ ) {
+        for ( int i = index; i < words.length && i < index + WINDOW_LENGTH; i++ ) {
             result[i-index] = words[i];
         }
 
         return String.join(" ", result);
     }
 
-    private static boolean arrayContains(T<? implements Comparable>[] array, T<? implements Comparable> target) {
+    private static <T extends Comparable> boolean arrayContains(T[] array, T target) {
         for (T element : array) {
             if (element.compareTo(target) == 0) {
                 return true;
