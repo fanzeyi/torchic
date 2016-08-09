@@ -111,6 +111,7 @@ func (i Indexer) process(job *crawler.CrawlResponse) {
 	text := doc.ExtractText()
 	words := i.segment(text)
 	processed := make([]string, 0)
+	stemmed := make([]string, 0)
 
 	for _, word := range words {
 		if !validateWord(word) {
@@ -120,21 +121,22 @@ func (i Indexer) process(job *crawler.CrawlResponse) {
 		// ISSUE: triming point would make "U.S." became "U."
 		word = strings.TrimFunc(word, func(c rune) bool {
 			switch c {
-			case ',', '.', '"', ':', '(', ')', '?':
+			case ',', '"', ':', '(', ')', '?':
 				return true
 			}
 			return false
 		})
 
-		processed = append(processed, english.Stem(word, true))
+		processed = append(processed, word)
+		stemmed = append(stemmed, english.Stem(word, true))
 	}
 
 	//glog.Infof("words: %v", doc.ExtractText())
 	//glog.Infof("%v", processed)
 
 	if len(processed) > 0 {
-		if id, ok := i.save(job.Link, job.Document, text); ok {
-			i.index(id, processed)
+		if id, ok := i.save(job.Link, job.Document, processed); ok {
+			i.index(id, stemmed)
 		}
 	}
 }
@@ -146,7 +148,7 @@ func (i Indexer) segment(text string) []string {
 	})
 }
 
-func (i Indexer) save(link *crawler.URLContext, doc *goquery.Document, text string) (id int64, ok bool) {
+func (i Indexer) save(link *crawler.URLContext, doc *goquery.Document, words []string) (id int64, ok bool) {
 	db := mysql.GetConn()
 
 	html, err := goquery.OuterHtml(doc.AndSelf())
@@ -155,7 +157,7 @@ func (i Indexer) save(link *crawler.URLContext, doc *goquery.Document, text stri
 		glog.Errorf("Error while getting html from document: %s", err)
 	}
 
-	res, err := db.Exec("INSERT INTO urls (hash, url, html, text) VALUES(?, ?, ?, ?)", link.Hash(), link.URL().String(), html, text)
+	res, err := db.Exec("INSERT INTO urls (hash, url, html, text) VALUES(?, ?, ?, ?)", link.Hash(), link.URL().String(), html, strings.Join(words, " "))
 
 	if err != nil {
 		glog.Errorf("Error while inserting into MySQL: %s", err)
