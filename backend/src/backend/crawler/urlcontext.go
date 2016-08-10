@@ -85,6 +85,10 @@ func (uc *URLContext) NormalizedHash() string {
 	return uc.hash(uc.normalizedURL)
 }
 
+func (uc *URLContext) CompareTo(ctx *URLContext) bool {
+	return uc.normalizedURL.String() == ctx.normalizedURL.String()
+}
+
 func deserializeURLContext(data string) *URLContext {
 	parts := strings.Split(data, ":")
 	link, err := base64.StdEncoding.DecodeString(parts[0])

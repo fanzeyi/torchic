@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
@@ -23,7 +24,7 @@ const (
 	visitedPrefix      = "visited"
 	visitedPrefixSplit = len(visitedPrefix) + 3
 	// (unit: second) 7200 seconds = 2 hour
-	visitedExpireTime = 7200
+	visitedExpireTime = 86400
 )
 
 const (
@@ -88,7 +89,7 @@ func (c *Crawler) coordinatorRun() {
 
 		ctx := deserializeURLContext(reply)
 
-		if c.hasVisited(conn, ctx) {
+		if c.hasVisited(conn, ctx) || strings.HasPrefix(ctx.NormalizedURL().Host, "en.m") {
 			// visited, drop task
 			conn.Do("RPOP", key)
 			continue
@@ -190,7 +191,7 @@ func (c *Crawler) hasVisited(conn redis.ResourceConn, link *URLContext) bool {
 
 	now := time.Now().Unix()
 
-	return now < lastTs+visitedExpireTime // || link.NormalizedURL().Host != "en.wikipedia.org"
+	return now < lastTs+visitedExpireTime
 }
 
 func (c *Crawler) setVisited(conn redis.ResourceConn, link *URLContext) {

@@ -24,6 +24,15 @@ const (
 	TotalDocumentsKey = "total_documents"
 )
 
+var (
+	WeightedElements = map[string]uint{
+		"title": 4,
+		"h1":    4,
+		"h2":    3,
+		"h3":    2,
+	}
+)
+
 type Indexer struct {
 	incoming *utils.PopChannel
 }
@@ -108,10 +117,39 @@ func validateWord(word string) bool {
 
 func (i Indexer) process(job *crawler.CrawlResponse) {
 	doc := Document(*job.Document)
-	text := doc.ExtractText()
+
+	// process body first
+	words := i.processText(doc.ExtractText())
+
+	if id, ok := i.saveDocument(job.Link, job.Document, words); ok {
+		i.indexText(id, words, 1)
+
+		// index title
+		//for tag, weight := range WeightedElements {
+		//elements := job.Document.Find(tag)
+
+		//if len(elements.Nodes) == 0 {
+		//continue
+		//}
+
+		//words = i.processText(elements.Text())
+		//i.indexText(id, words, weight)
+		//}
+	}
+
+	i.finishProcess()
+}
+
+func (i Indexer) finishProcess() {
+	c := redis.GetConn()
+	defer redis.ReturnConn(c)
+
+	c.Do("INCR", TotalDocumentsKey)
+}
+
+func (i Indexer) processText(text string) []string {
 	words := i.segment(text)
 	processed := make([]string, 0)
-	stemmed := make([]string, 0)
 
 	for _, word := range words {
 		if !validateWord(word) {
@@ -120,35 +158,39 @@ func (i Indexer) process(job *crawler.CrawlResponse) {
 
 		// ISSUE: triming point would make "U.S." became "U."
 		word = strings.TrimFunc(word, func(c rune) bool {
-			switch c {
-			case ',', '"', ':', '(', ')', '?':
-				return true
-			}
-			return false
+			return unicode.IsPunct(c)
 		})
 
 		processed = append(processed, word)
+	}
+
+	return processed
+}
+
+func (i Indexer) stemWords(words []string) []string {
+	stemmed := make([]string, 0)
+
+	for _, word := range words {
 		stemmed = append(stemmed, english.Stem(word, true))
 	}
 
-	//glog.Infof("words: %v", doc.ExtractText())
-	//glog.Infof("%v", processed)
+	return stemmed
+}
 
-	if len(processed) > 0 {
-		if id, ok := i.save(job.Link, job.Document, processed); ok {
-			i.index(id, stemmed)
-		}
+func (i Indexer) indexText(id int64, words []string, weight uint) {
+	if len(words) > 0 {
+		i.saveToRedis(id, i.stemWords(words), weight)
 	}
 }
 
 func (i Indexer) segment(text string) []string {
 	return strings.FieldsFunc(text, func(c rune) bool {
 		// TODO: need more consideration on using '-' as a separator
-		return unicode.IsSpace(c) || c == '/' || c == '-'
+		return unicode.IsSpace(c) || c == '/' || c == '-' || c == ':'
 	})
 }
 
-func (i Indexer) save(link *crawler.URLContext, doc *goquery.Document, words []string) (id int64, ok bool) {
+func (i Indexer) saveDocument(link *crawler.URLContext, doc *goquery.Document, words []string) (id int64, ok bool) {
 	db := mysql.GetConn()
 
 	html, err := goquery.OuterHtml(doc.AndSelf())
@@ -176,7 +218,7 @@ func (i Indexer) save(link *crawler.URLContext, doc *goquery.Document, words []s
 	return
 }
 
-func (i Indexer) index(id int64, words []string) {
+func (i Indexer) saveToRedis(id int64, words []string, weight uint) {
 	var count map[string]uint
 
 	count = make(map[string]uint)
@@ -194,7 +236,7 @@ func (i Indexer) index(id int64, words []string) {
 	sadd = append(sadd, redis.BuildKey(UrlPrefix, "%d", id))
 
 	for word, num := range count {
-		c.Send("ZADD", redis.BuildKey(TermPrefix, "%s", word), num, id)
+		c.Send("ZADD", redis.BuildKey(TermPrefix, "%s", word), num*weight, id)
 		sadd = append(sadd, word)
 	}
 
@@ -205,8 +247,8 @@ func (i Indexer) index(id int64, words []string) {
 		c.Send("SADD", sadd...)
 	}
 
-	c.Send("SET", redis.BuildKey(CountPrefix, "%s", id), len(count))
-	c.Send("INCR", TotalDocumentsKey)
+	c.Send("INCRBY", redis.BuildKey(CountPrefix, "%d", id), len(count))
+	c.Send("INCRBY", "total_words", len(count))
 
 	_, err := c.Do("EXEC")
 

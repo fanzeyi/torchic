@@ -74,6 +74,7 @@ var HttpClient = &http.Client{
 			}
 			return nil
 		}
+		glog.Warningf("Redirection detected: %v", req)
 		return ErrEnqueueRedirect
 	},
 	Timeout: 10 * time.Second,
@@ -374,9 +375,34 @@ func (w *Worker) visitURL(target *URLContext, res *http.Response) {
 		if lang, exist := doc.Find("html").Attr("lang"); exist && !strings.HasPrefix(lang, "en") {
 			return
 		}
-		links := w.processLinks(target, doc)
-		glog.Infof("[%s] Sending to enqueue, length=%d", w.id, len(links))
-		w.enqueue <- links
+
+		robotMeta, robotMetaExist := doc.Find("meta[name=\"robots\"]").Attr("content")
+
+		if robotMetaExist && strings.Index(robotMeta, "noindex") != -1 {
+			return
+		}
+
+		canonical, canonicalExist := doc.Find("link[rel=\"canonical\"]").Attr("href")
+
+		if canonicalExist {
+
+			canonicalCtx, err := stringToURLContext(canonical, nil)
+
+			if err != nil {
+				glog.Errorf("Error while converting canonical URL: %s", err)
+			} else if !target.CompareTo(canonicalCtx) {
+				// it is not the original page
+
+				w.enqueueSingle(canonicalCtx.url, target.url)
+				return
+			}
+		}
+
+		if !(robotMetaExist && strings.Index(robotMeta, "nofollow") != -1) {
+			links := w.processLinks(target, doc)
+			glog.Infof("[%s] Sending to enqueue, length=%d", w.id, len(links))
+			w.enqueue <- links
+		}
 	}
 
 	w.visited(target)

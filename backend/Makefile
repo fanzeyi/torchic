@@ -35,3 +35,4 @@ clean-db:
 	@echo "\033[0;31mYou are going to delete all the data\033[0m"
 	@mysql -uroot -p -e "TRUNCATE TABLE urls" codeu
 	@redis-cli FLUSHDB
+	@redis-cli -n 1 FLUSHDB
