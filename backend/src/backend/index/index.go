@@ -26,10 +26,10 @@ const (
 
 var (
 	WeightedElements = map[string]uint{
-		"title": 4,
-		"h1":    4,
-		"h2":    3,
-		"h3":    2,
+		"title": 3,
+		"h1":    3,
+		"h2":    2,
+		"h3":    1,
 	}
 )
 
@@ -125,16 +125,16 @@ func (i Indexer) process(job *crawler.CrawlResponse) {
 		i.indexText(id, words, 1)
 
 		// index title
-		//for tag, weight := range WeightedElements {
-		//elements := job.Document.Find(tag)
+		for tag, weight := range WeightedElements {
+			elements := job.Document.Find(tag)
 
-		//if len(elements.Nodes) == 0 {
-		//continue
-		//}
+			if len(elements.Nodes) == 0 {
+				continue
+			}
 
-		//words = i.processText(elements.Text())
-		//i.indexText(id, words, weight)
-		//}
+			words = i.processText(elements.Text())
+			i.indexText(id, words, weight)
+		}
 	}
 
 	i.finishProcess()
@@ -236,7 +236,7 @@ func (i Indexer) saveToRedis(id int64, words []string, weight uint) {
 	sadd = append(sadd, redis.BuildKey(UrlPrefix, "%d", id))
 
 	for word, num := range count {
-		c.Send("ZADD", redis.BuildKey(TermPrefix, "%s", word), num*weight, id)
+		c.Send("ZADD", redis.BuildKey(TermPrefix, "%s", word), "INCR", num*weight, id)
 		sadd = append(sadd, word)
 	}
 
