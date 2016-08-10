@@ -103,6 +103,7 @@ func (w *Worker) run() {
 
 				continue
 			}
+
 			reply, err = redigo.String(conn.Do("BRPOPLPUSH", key, workKey, 10))
 
 			if err != nil {

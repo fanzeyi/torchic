@@ -35,6 +35,7 @@ var (
 
 type Indexer struct {
 	incoming *utils.PopChannel
+	readonly bool
 }
 
 type Document goquery.Document
@@ -69,9 +70,10 @@ func (d Document) ExtractText() string {
 	return buf.String()
 }
 
-func NewIndexer(incoming *utils.PopChannel) *Indexer {
+func NewIndexer(incoming *utils.PopChannel, readonly bool) *Indexer {
 	indexer := new(Indexer)
 	indexer.incoming = incoming
+	indexer.readonly = readonly
 
 	return indexer
 }
@@ -99,6 +101,7 @@ func validateWord(word string) bool {
 			hasLatin = true
 			continue
 		} else if unicode.IsNumber(char) {
+			hasLatin = true
 			continue
 		} else if unicode.IsPunct(char) {
 			continue
@@ -121,7 +124,17 @@ func (i Indexer) process(job *crawler.CrawlResponse) {
 	// process body first
 	words := i.processText(doc.ExtractText())
 
-	if id, ok := i.saveDocument(job.Link, job.Document, words); ok {
+	var id int64
+	var ok bool
+
+	if i.readonly {
+		id, ok = i.getDocumentId(job.Link)
+	} else {
+		id, ok = i.saveDocument(job.Link, job.Document, words)
+	}
+
+	if ok {
+		glog.Infof("here")
 		i.indexText(id, words, 1)
 
 		// index title
@@ -190,6 +203,24 @@ func (i Indexer) segment(text string) []string {
 	})
 }
 
+func (i Indexer) getDocumentId(link *crawler.URLContext) (id int64, ok bool) {
+	db := mysql.GetConn()
+
+	row := db.QueryRow("SELECT id FROM urls WHERE hash = ?", link.Hash())
+
+	err := row.Scan(&id)
+
+	if err != nil {
+		ok = false
+		glog.Errorf("%s", err)
+		return
+	}
+
+	ok = true
+
+	return
+}
+
 func (i Indexer) saveDocument(link *crawler.URLContext, doc *goquery.Document, words []string) (id int64, ok bool) {
 	db := mysql.GetConn()
 
@@ -232,20 +263,20 @@ func (i Indexer) saveToRedis(id int64, words []string, weight uint) {
 
 	c.Send("MULTI")
 
-	sadd := make([]interface{}, 0)
-	sadd = append(sadd, redis.BuildKey(UrlPrefix, "%d", id))
+	//sadd := make([]interface{}, 0)
+	//sadd = append(sadd, redis.BuildKey(UrlPrefix, "%d", id))
 
 	for word, num := range count {
 		c.Send("ZADD", redis.BuildKey(TermPrefix, "%s", word), "INCR", num*weight, id)
-		sadd = append(sadd, word)
+		//sadd = append(sadd, word)
 	}
 
-	if len(sadd) > 1 {
-		c.Send("SADD", sadd...)
+	//if len(sadd) > 1 {
+	//c.Send("SADD", sadd...)
 
-		sadd[0] = TermSetKey
-		c.Send("SADD", sadd...)
-	}
+	//sadd[0] = TermSetKey
+	//c.Send("SADD", sadd...)
+	//}
 
 	c.Send("INCRBY", redis.BuildKey(CountPrefix, "%d", id), len(count))
 	c.Send("INCRBY", "total_words", len(count))

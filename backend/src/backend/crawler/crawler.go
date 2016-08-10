@@ -79,6 +79,7 @@ func (c *Crawler) coordinatorRun() {
 
 	for {
 		key := redis.BuildKey(crawlQueue, "%d", c.id)
+
 		reply, err := redigo.String(conn.Do("BRPOPLPUSH", crawlQueue, key, 10))
 
 		if reply == "" || err != nil {

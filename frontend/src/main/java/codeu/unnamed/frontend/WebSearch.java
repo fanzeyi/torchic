@@ -28,7 +28,7 @@ public class WebSearch {
 	public WebSearch(Set<Tuple> map, String term, Integer termWeight)
 	{
 		this.term = term;
-		this.mapBM = new MapBM<Tuple>(map, index, term, termWeight);
+		this.mapBM = new MapBM<>(map, index, term, termWeight);
 	}
 	public WebSearch()
 	{

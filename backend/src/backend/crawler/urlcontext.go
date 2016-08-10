@@ -152,6 +152,10 @@ func stringToURLContext(str string, src *url.URL) (*URLContext, error) {
 	return urlToURLContext(u, src), nil
 }
 
+func StringToURLContext(str string, src *url.URL) (*URLContext, error) {
+	return stringToURLContext(str, src)
+}
+
 func urlsToURLContexts(urls []*url.URL, source *url.URL) (result []*URLContext) {
 	for _, u := range urls {
 		result = append(result, urlToURLContext(u, source))
