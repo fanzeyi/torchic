@@ -6,14 +6,36 @@
       .replace(/>/g, '&gt;');
   };
 
-  var highlight = function(text, query) {
-    var terms = query.split(/\s/);
+  var stemmer = new Snowball("English");
 
-    for (term of terms) {
-      text = text.replace(new RegExp(term, 'i'), "<strong>$&</strong>");
+  var stem = function(w) {
+    stemmer.setCurrent(w);
+    stemmer.stem();
+    return stemmer.getCurrent();
+  }
+
+  var highlight = function(text, query) {
+    var terms = query.split(/\s/).map(function(w) { return w.toLowerCase(); }).map(stem);
+    var words = text.split(/\s/);
+    var result = [];
+
+    for (word of words) {
+      var flag = false;
+      for (term of terms) {
+        if (stem(word.toLowerCase()) == term.toLowerCase()) {
+          flag = true;
+          break;
+        }
+      }
+
+      if (flag) {
+        result.push(`<strong>${word}</strong>`);
+      } else {
+        result.push(word);
+      }
     }
 
-    return text;
+    return result.join(" ");
   };
 
   var xhr;
@@ -65,6 +87,8 @@
       }
 
       for (item of resp) {
+        if (item == null) continue;
+
         var entry = `<li class="search-result">
           <h2><a href="${item.url}">${highlight(item.title, q)}</a></h2>
           <small class="meta">${highlight(escapeHTML(item.url), q)}</small>
