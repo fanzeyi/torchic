@@ -18,7 +18,6 @@ public class WebSearch {
 	private MapBM<Tuple> mapBM;
 	//number of times term t appears in all documents of collection containing term t
 	private String term;
-	private static Integer totalDocuments;
 	protected static JedisIndex index = new JedisIndex(new Jedis("localhost", 6379));
 
     /**
@@ -48,55 +47,14 @@ public class WebSearch {
 			bmList.add(search.mapBM.getMap());
 		}
 
-		Map<String, Double> resMap = one(bmList);
+        Map<String, Double> result = bmList.stream().reduce(new HashMap<>(), (res, elm) -> {
+            for (Map.Entry<String, Double> entry : elm.entrySet()) {
+                res.merge(entry.getKey(), entry.getValue(), (a, b) -> a+b);
+            }
+            return res;
+        });
 
-		String[] queries = terms.toArray(new String[0]);
-
-		return new ResultMap(resMap, queries);
-	}
-	private static Map<String, Double> one(List<Map<String, Double>> maps)
-	{
-		if(maps.size() == 0)
-		{
-			return new HashMap<>();
-		}
-		else if(maps.size()==1)
-		{
-			return maps.get(0);
-		}
-		else
-		{
-			Map<String, Double> l1 = maps.get(0);
-			Map<String, Double> l2 = maps.get(1);
-			List<Map<String, Double>> l3 = maps.subList(2, maps.size());
-			return two(two(l1,l2),one(l3));
-		}
-	}
-	private static Map<String, Double> two(Map<String, Double> m1, Map<String, Double> m2)
-	{
-		Map<String, Double> combined = new HashMap<>();
-		Set<String> m1_keys = m1.keySet();
-		Set<String> m2_keys = m2.keySet();
-		for(String s:m1_keys)
-		{
-			if(m2.containsKey(s))
-			{
-				Double rel = m1.get(s)+m2.get(s);
-				combined.put(s,rel);
-				m2_keys.remove(s);
-			}
-			else
-			{
-				Double rel = m1.get(s);
-				combined.put(s, rel);
-			}
-		}
-		for(String s:m2_keys)
-		{
-			Double rel = m2.get(s);
-			combined.put(s, rel);
-		}
-		return combined;
+		return new ResultMap(result);
 	}
 
 	/**
@@ -111,7 +69,6 @@ public class WebSearch {
 		Integer termWeight = query.getValue();
 
 		Set<Tuple> map = index.getCounts(term); // mapping from document to term frequency
-//		totalDocuments = index.getTotalDocuments();
 
 		return new WebSearch(map, term, termWeight);
 

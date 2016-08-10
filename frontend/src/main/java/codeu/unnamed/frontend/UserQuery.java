@@ -22,7 +22,7 @@ public class UserQuery
 	{
 		Map<String, Integer> map = new HashMap<>();
 		for(String s: queries) {
-            map.put(s, map.getOrDefault(s, 0)+1);
+            map.merge(s, 1, (a, b) -> a + b);
 		}
 		return map;
 	}
