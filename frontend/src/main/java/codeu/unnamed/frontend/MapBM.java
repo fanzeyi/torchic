@@ -1,129 +1,59 @@
 package codeu.unnamed.frontend;
-import java.io.IOException;
-import java.util.Collections;
-import java.util.Comparator;
+
 import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.Map.Entry;
-import java.util.HashSet;
-import java.util.Scanner;
+import java.util.stream.Collectors;
 
-import redis.clients.jedis.Jedis;
+import redis.clients.jedis.Tuple;
 
-public class MapBM<K,V> extends HashMap<K,V> implements MapRelevance<K,V>
+public class MapBM<T>
 {
-	protected Map<String,Double> map;
-	protected JedisIndex index;
-	protected String term;
-	private Integer termWeight;
-	private final double K1 = 1.2;
-	private final double K2 = 100;
-	
-	public MapBM(Map<String, Integer> old, JedisIndex index, String term, Integer termWeight)
-	{
-		this.index = index;
-		this.term = term;
-		this.termWeight = termWeight;
-		this.map = convert(old);
-	}
-	public Map<String, Double> getMap()
-	{
-		return this.map;
-	}
-	public Double getRel(String s)
-	{
-		return this.map.get(s) == null ? 0.0 : this.map.get(s);
-	}
-	public int size()
-	{
-		return this.map.size();
-	}
-	public Set<K> keySet()
-	{
-		return (Set<K>) this.map.keySet();
-	}
-	/**
-	 * Takes in a mapping from documents to term frequency and returns a mapping
-	 * from documents to BM25 relevance score
-	 */
-	public Map<String, Double> convert(Map<String, Integer> old)
-	{
-		Map<String, Double> newMap = new HashMap<String, Double>();
-		Set keySet = old.keySet();
-		for(Object s: keySet.toArray())
-		{
-			String url = s.toString();
-			newMap.put(url, getSingleRelevance(url));
-		}
-		return newMap;
-	}
-	public double getSingleRelevance(String url)
-	{
-		try {
-			double averageDocLength = index.getAverageDocLength();
-			int docLength = index.termsIndexedOnPage(url);
-			int termFrequency = index.getCount(url, this.term);
-			double k = new Double(1.2*(0.25+(0.75*(docLength/averageDocLength))));
-			double a = (0.5/0.5);
-			int numberOfDocsContainingTerm = index.numberOfDocsContainingTerm(term);
-			int totalDocuments = index.getTotalDocuments();
-			double b = ((numberOfDocsContainingTerm+0.5)/(totalDocuments-numberOfDocsContainingTerm+0.5));
-			double c = ((1.2+1)*(termFrequency))/(k+termFrequency);
-			double d = (double)(((100+1)*(termWeight))/(100+termWeight));//
-			double result = ((Math.log(a/b))*c*d)*100;
-			//System.out.println(result);
-			return result;
-		}
-		catch (Exception e)
-		{
-			e.printStackTrace();
-		}
-		return 0;
-	}
+    protected Map<String,Double> map;
+    protected JedisIndex index;
+    protected String term;
+    private Integer termWeight;
+    private final double K1 = 1.2;
+    private final double K2 = 100;
 
-	public List<Entry<String, Double>> sort() {
-		Set<Entry<String,Double>> entrySet = this.map.entrySet();
-		List<Entry<String, Double>> list = new LinkedList<Entry<String, Double>>(entrySet);
-		System.out.println("showlist");
-		showList(list);
-		System.out.println("showlist");
+    public MapBM(Set<Tuple> old, JedisIndex index, String term, Integer termWeight)
+    {
+        this.index = index;
+        this.term = term;
+        this.termWeight = termWeight;
+        this.map = convert(old);
+    }
+    public Map<String, Double> getMap()
+    {
+        return this.map;
+    }
 
-		Comparator<Entry<String, Double>> c = new Comparator<Entry<String, Double>>()
-		{
-			@Override
-			public int compare(Entry<String, Double> e1, Entry<String, Double> e2)
-			{
-				Double val_e1 = new Double(e1.getValue().toString());
-				Double val_e2 = new Double(e2.getValue().toString());
-				return val_e1.compareTo(val_e2);
-			}
-		};
-		Collections.sort(list, c);
-		return list;
-	}
-	public void showList(List<Entry<String,Double>> list)
-	{
-		System.out.println("Size:"+list.size());
-		for(Entry<String, Double> e: list)
-		{
-			System.out.println("Entry:"+e);
-		}
-	}
-	public void entryView()
-	{
-		List<Entry<String, Double>> entries = new LinkedList<Entry<String, Double>>(this.map.entrySet());
-		System.out.println(entries.toString());
-	}
+    /**
+     * Takes in a mapping from documents to term frequency and returns a mapping
+     * from documents to BM25 relevance score
+     */
+    public Map<String, Double> convert(Set<Tuple> old) {
+        return old.stream().collect(Collectors.toMap(Tuple::getElement, this::getSingleRelevance));
+    }
 
-	public void print() {
-		List<Entry<String, Double>> entries = sort();
-		for (Entry<String, Double> entry: entries) {
-			System.out.println(entry);
-		}
-	}
-	
-	
+    public double getSingleRelevance(Tuple entry)
+    {
+        String url = entry.getElement();
+
+        double averageDocLength = index.getAverageDocLength();
+        int docLength = index.termsIndexedOnPage(url);
+        int termFrequency = (int)entry.getScore();
+
+        double k = K1*(0.25+(0.75*(docLength/averageDocLength)));
+        double a = (0.5/0.5);
+        int numberOfDocsContainingTerm = index.numberOfDocsContainingTerm(term);
+        int totalDocuments = index.getTotalDocuments();
+        double b = ((numberOfDocsContainingTerm+0.5)/(totalDocuments-numberOfDocsContainingTerm+0.5));
+        double c = ((1.2+1)*(termFrequency))/(k+termFrequency);
+        double d = (double)(((100+1)*(termWeight))/(100+termWeight));//
+        double result = ((Math.log(a/b))*c*d)*100;
+
+        return result;
+    }
+
 }

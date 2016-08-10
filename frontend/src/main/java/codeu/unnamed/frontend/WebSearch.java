@@ -1,18 +1,12 @@
 package codeu.unnamed.frontend;
 import java.io.IOException;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.HashSet;
-import java.util.Scanner;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Component;
 import redis.clients.jedis.Jedis;
+import redis.clients.jedis.Tuple;
 
 /**
 * Represents the results of a search query.
@@ -20,54 +14,51 @@ import redis.clients.jedis.Jedis;
 */
 @Component
 public class WebSearch {
-	// map from document that contains term t to term frequency
-	private MapTF map;
 	// map from document containing term t to BM25 score
-	private MapBM<String, Double> mapBM;
+	private MapBM<Tuple> mapBM;
 	//number of times term t appears in all documents of collection containing term t
-	private Integer n_i;
 	private String term;
-	private static Integer TOTALDOCUMENTS;
+	private static Integer totalDocuments;
 	protected static JedisIndex index = new JedisIndex(new Jedis("localhost", 6379));
-	/**
+
+    /**
 	* Constructor.
 	*
-	* @param map
-	*/
-
-	public WebSearch(Map<String, Integer> map, String term, Integer termWeight)
+     * @param map
+     */
+	public WebSearch(Set<Tuple> map, String term, Integer termWeight)
 	{
-		this.map = new MapTF(map, term);
-		this.n_i = this.map.getTotalFrequency();
 		this.term = term;
-		this.mapBM = new MapBM<String, Double>(map, index, term, termWeight);
+		this.mapBM = new MapBM<Tuple>(map, index, term, termWeight);
 	}
 	public WebSearch()
 	{
-		this.map = null;
-		this.n_i = null;
 		this.term = null;
 		this.mapBM = null;
 	}
 
 	public static ResultMap multiSearch(List<WebSearch> list)
 	{
-		List<Map<String, Double>> bmList = new LinkedList<Map<String, Double>>();
-		List<String> terms = new LinkedList<String>();
-		for(WebSearch search: list)
-		{
+		List<Map<String, Double>> bmList = new ArrayList<>();
+		List<String> terms = new ArrayList<>();
+
+		for(WebSearch search: list) {
 			terms.add(search.term);
+
 			bmList.add(search.mapBM.getMap());
 		}
+
 		Map<String, Double> resMap = one(bmList);
+
 		String[] queries = terms.toArray(new String[0]);
+
 		return new ResultMap(resMap, queries);
 	}
 	private static Map<String, Double> one(List<Map<String, Double>> maps)
 	{
 		if(maps.size() == 0)
 		{
-			return new HashMap<String, Double>();
+			return new HashMap<>();
 		}
 		else if(maps.size()==1)
 		{
@@ -83,9 +74,9 @@ public class WebSearch {
 	}
 	private static Map<String, Double> two(Map<String, Double> m1, Map<String, Double> m2)
 	{
-		Map<String, Double> combined = new HashMap<String, Double>();
-		Set<String> m1_keys = (Set<String>)m1.keySet();
-		Set<String> m2_keys = (Set<String>)m2.keySet();
+		Map<String, Double> combined = new HashMap<>();
+		Set<String> m1_keys = m1.keySet();
+		Set<String> m2_keys = m2.keySet();
 		for(String s:m1_keys)
 		{
 			if(m2.containsKey(s))
@@ -119,12 +110,9 @@ public class WebSearch {
 		String term = query.getKey();
 		Integer termWeight = query.getValue();
 
-		Map<String, Integer> map = index.getCounts(term);//mapping from document to term frequency
-		//Integer totalTermFrequency = new Integer(index.returnTotal(map));//should be: number of times term i appears in all documents
-		//Integer totalTermFrequency = new Integer(map.totalFrequency(term));
-		//System.out.println(term+": n_i: "+n_i);
-		TOTALDOCUMENTS = index.getTotalDocuments();
-		//return new WebSearch(map, term, totalTermFrequency, termWeight);
+		Set<Tuple> map = index.getCounts(term); // mapping from document to term frequency
+//		totalDocuments = index.getTotalDocuments();
+
 		return new WebSearch(map, term, termWeight);
 
 	}
@@ -135,12 +123,7 @@ public class WebSearch {
 	*/
 	public static List<WebSearch> search(UserQuery query)
 	{
-		List<WebSearch> list = new LinkedList<WebSearch>();
-		for(Entry<String,Integer> e: query.getQueries())
-		{
-			list.add(singleSearch(e));
-		}
-		return list;
+		return query.getQueries().stream().map(WebSearch::singleSearch).collect(Collectors.toList());
 	}
 	
    public List<String> processQueries(String[] q)
@@ -152,20 +135,6 @@ public class WebSearch {
    }
 	
 	public static void main(String[] args) throws IOException {
-		/*Scanner in = new Scanner(System.in);
-		System.out.println("Please enter search terms");
-		String s = in.nextLine();
-		UserQuery query = new UserQuery(s);
-		List<WebSearch> searchResults = search(query);
-		System.out.println("Multi print");
-		//WebSearch one = searchResults.get(0);
-		//System.out.println("ONE");
-		//one.mapBM.entryView();
-		ResultMap multi = multiSearch(searchResults);
-		multi.print();
-		//List<Entry<String, Double>> results = multi.returnResultSet();
-		
-		System.out.println("end");*/
 		String[] q = {"java", "project"};
 		System.out.println(new WebSearch().processQueries(q));
 	}
