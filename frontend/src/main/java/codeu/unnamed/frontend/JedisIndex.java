@@ -21,7 +21,6 @@ import redis.clients.jedis.Transaction;
 public class JedisIndex {
 
 	private Jedis jedis;
-	private Integer totalDocsIndexed;
 	/**
 	 * Constructor.
 	 *
@@ -29,11 +28,13 @@ public class JedisIndex {
 	 */
 	public JedisIndex(Jedis jedis) {
 		this.jedis = jedis;
-		this.totalDocsIndexed = this.getTotalDocuments();
 	}
 	public int getTotalDocuments()
 	{
-		return new Integer(jedis.get("total_documents"));
+		String total = jedis.get("total_documents");
+		if (total == null) return 0;
+
+		return new Integer(total);
 	}
 	//key for a set that stores all the words occuring on the given page
 	private String urlSet(String url)
@@ -45,7 +46,7 @@ public class JedisIndex {
 	{
 		return "count:"+url;
 	}
-	public Integer getPageWordCount(String url)
+	public int getPageWordCount(String url)
 	{
 		return Integer.valueOf(jedis.get(wordCountKey(url)));
 	}
@@ -64,7 +65,7 @@ public class JedisIndex {
 	public Set<String> getURLs(String term) {
 		//Set<String> set = jedis.smembers(urlSetKey(term));
 		String termKey = termURLs(term);
-		Set<String> set = jedis.zrange(termKey,0,20);
+		Set<String> set = jedis.zrevrange(termKey,0,20);
 		return set;
 	}
 	//looks up a search term and returns a set of ranked urls from given indices
@@ -79,19 +80,24 @@ public class JedisIndex {
 		String key = termURLs(term);
 		return jedis.zcard(key).intValue();
 	}
-	public Integer totalTermsIndexed()
+	public int totalTermsIndexed()
 	{
-		return new Integer(jedis.scard("terms").intValue());
+		return new Integer(jedis.get("total_words"));
 	}
-	public Integer termsIndexedOnPage(String url)
+	public int termsIndexedOnPage(String url)
 	{
 		String key = urlSet(url);
 		return new Integer(jedis.scard(key).toString());
 	}
 	public Double getAverageDocLength()
 	{
-		Double result = new Double(this.totalTermsIndexed()/this.totalDocsIndexed);
-		return result;
+		int total = this.getTotalDocuments();
+
+		if (total == 0) {
+			return 0.0;
+		}
+
+		return ((double)totalTermsIndexed()) / ((double)total);
 	}
 	/**
 	 * Checks whether a given URL is indexed
@@ -180,7 +186,6 @@ public class JedisIndex {
 			t.del(key);
 		}
 		t.exec();
-		this.totalDocsIndexed = 0;
 	}
 
 	/**

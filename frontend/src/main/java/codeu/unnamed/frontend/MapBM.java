@@ -60,28 +60,28 @@ public class MapBM<K,V> extends HashMap<K,V> implements MapRelevance<K,V>
 		}
 		return newMap;
 	}
-	public Double getSingleRelevance(String url)
+	public double getSingleRelevance(String url)
 	{
 		try {
-			Double averageDocLength = index.getAverageDocLength();
-			Integer docLength = index.termsIndexedOnPage(url);
-			Integer termFrequency = index.getCount(url, this.term);
-			Double k = new Double(1.2*(0.25+(0.75*(docLength/averageDocLength))));
-			Double a = (0.5/0.5);
-			Integer numberOfDocsContainingTerm = index.numberOfDocsContainingTerm(term);
-			Integer totalDocuments = index.getTotalDocuments();
-			Double b = ((numberOfDocsContainingTerm+0.5)/(totalDocuments-numberOfDocsContainingTerm+0.5));
-			Double c = ((1.2+1)*(termFrequency))/(k+termFrequency);
-			Double d = (double)(((100+1)*(termWeight))/(100+termWeight));//
-			Double result = ((Math.log(a/b))*c*d)*100;
+			double averageDocLength = index.getAverageDocLength();
+			int docLength = index.termsIndexedOnPage(url);
+			int termFrequency = index.getCount(url, this.term);
+			double k = new Double(1.2*(0.25+(0.75*(docLength/averageDocLength))));
+			double a = (0.5/0.5);
+			int numberOfDocsContainingTerm = index.numberOfDocsContainingTerm(term);
+			int totalDocuments = index.getTotalDocuments();
+			double b = ((numberOfDocsContainingTerm+0.5)/(totalDocuments-numberOfDocsContainingTerm+0.5));
+			double c = ((1.2+1)*(termFrequency))/(k+termFrequency);
+			double d = (double)(((100+1)*(termWeight))/(100+termWeight));//
+			double result = ((Math.log(a/b))*c*d)*100;
 			//System.out.println(result);
 			return result;
 		}
 		catch (Exception e)
 		{
-			System.out.println("Message:"+e.getMessage());
+			e.printStackTrace();
 		}
-		return null;
+		return 0;
 	}
 
 	public List<Entry<String, Double>> sort() {

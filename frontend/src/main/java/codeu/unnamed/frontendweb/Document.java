@@ -2,6 +2,7 @@ package codeu.unnamed.frontendweb;
 
 import javax.persistence.*;
 import javax.validation.constraints.NotNull;
+import java.io.UnsupportedEncodingException;
 
 /**
  * Created by fanzeyi on 8/3/16.
@@ -20,7 +21,7 @@ public class Document {
     private String url;
 
     @NotNull
-    private String text;
+    private byte[] text;
 
     @NotNull
     private String title;
@@ -32,9 +33,11 @@ public class Document {
         this.id = id;
     }
 
-    public Document(String hash, String url) {
+    public Document(String hash, String url, byte[] text, String title) {
         this.hash = hash;
         this.url = url;
+        this.text = text;
+        this.title = title;
     }
 
     public long getId() {
@@ -62,11 +65,12 @@ public class Document {
     }
 
     public String getText() {
-        return text;
-    }
-
-    public void setText(String text) {
-        this.text = text;
+        try {
+            return new String(this.text, "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
+        }
+        return new String(this.text);
     }
 
     public String getTitle() {

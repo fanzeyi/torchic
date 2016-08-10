@@ -13,7 +13,7 @@ public interface MapRelevance<K,V>
   /**
   * Calculates the relevance score for each document within a collection
   */
-  Double getSingleRelevance(String key);
+  double getSingleRelevance(String key);
   /**
   * Sorts the map in ascending order
   */
